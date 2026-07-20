@@ -1,0 +1,181 @@
+@use "../variables.scss" as *;
+
+// Panel chrome tracks the host app's theme (subscribeBackgroundColor sets the
+// background inline), so colours here stay neutral and translucent.
+$border: rgba(255, 255, 255, 0.12);
+$muted: rgba(255, 255, 255, 0.55);
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  color: #e8e8e8;
+  font: 12px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+
+  button {
+    padding: 4px 10px;
+    border: 1px solid $border;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+    font-size: 11px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+    &:disabled { opacity: 0.4; cursor: default; }
+
+    &.primary {
+      background: #4b7fd6;
+      border-color: #4b7fd6;
+      &:hover:not(:disabled) { background: #5a8de3; }
+    }
+  }
+
+  input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid $border;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.25);
+    color: inherit;
+    font-size: 11px;
+    &::placeholder { color: $muted; }
+  }
+}
+
+.spacer { flex: 1; }
+
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid $border;
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(75, 127, 214, 0.18);
+  border-bottom: 1px solid $border;
+  span { flex: 1; }
+}
+
+.grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  align-content: start;
+}
+
+.card {
+  border: 1px solid $border;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+
+  .thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: rgba(0, 0, 0, 0.45);
+
+    img,
+    video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    // The loop sits above the poster and only fades in on hover.
+    video {
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      &.visible { opacity: 1; }
+    }
+
+    .badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: #4b7fd6;
+      font-size: 10px;
+    }
+  }
+
+  .meta {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px 4px;
+
+    .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .sub {
+      color: $muted;
+      font-size: 10px;
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: 4px;
+    padding: 0 8px 8px;
+    button { flex: 1; }
+  }
+}
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 24px 8px;
+  color: $muted;
+  text-align: center;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid $border;
+
+  .status {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: $muted;
+  }
+}
+
+.setup {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+
+  h1 { font-size: 20px; }
+  p { max-width: 340px; color: $muted; }
+  code {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
