@@ -159,12 +159,37 @@ header {
         font-size: 14px;
         line-height: 1;
         &.primary { background: $red; }
+
+        // Destructive: neutral until hovered, then it commits to red so the
+        // intent is unmistakable before the click.
+        &.danger:hover:not(:disabled) {
+          background: $red;
+          border-color: $red;
+          color: #fff;
+        }
+      }
+
+      // Delete floats to the far left, isolating it from the primary actions
+      // packed on the right so it isn't a neighbour-of-a-misclick.
+      .trash { margin-right: auto; }
+
+      // The confirm "Delete" is a word, not a glyph — let it size to its text.
+      .danger:not(.trash) { width: auto; padding: 0 10px; }
+
+      .confirm-label {
+        margin-right: auto;
+        padding: 0 8px;
+        background: $black;
+        line-height: 30px;
+        font-size: 11px;
+        white-space: nowrap;
       }
     }
   }
 
   &:hover .thumb .overlay,
-  &:focus-within .thumb .overlay { opacity: 1; }
+  &:focus-within .thumb .overlay,
+  .thumb .overlay.visible { opacity: 1; }
 
   .meta {
     display: flex;

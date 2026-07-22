@@ -56,6 +56,29 @@ export const upsertSymbol = (root: string, meta: SymbolMeta): LibraryManifest =>
 export const getSymbol = (root: string, symbolId: string): SymbolMeta | undefined =>
   readManifest(root).symbols[symbolId];
 
+/** Drop a symbol from the manifest. Its on-disk assets are removed separately. */
+export const removeSymbol = (root: string, symbolId: string): LibraryManifest => {
+  const manifest = readManifest(root);
+  if (manifest.symbols[symbolId]) {
+    delete manifest.symbols[symbolId];
+    writeManifest(root, manifest);
+  }
+  return manifest;
+};
+
+/** Delete a symbol's on-disk folder (package + previews). No-op if already gone. */
+export const removeSymbolDir = (root: string, symbolId: string): void => {
+  const dir = symbolDir(root, symbolId);
+  if (!fs.existsSync(dir)) return;
+  // fs.rmSync (Node 14.14+) is present in CEP's runtime; fall back for safety.
+  const anyFs = fs as any;
+  if (anyFs.rmSync) {
+    anyFs.rmSync(dir, { recursive: true, force: true });
+  } else {
+    fs.rmdirSync(dir, { recursive: true });
+  }
+};
+
 export const listSymbols = (root: string): SymbolMeta[] => {
   const { symbols } = readManifest(root);
   return Object.keys(symbols).map((id) => symbols[id]);

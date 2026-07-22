@@ -5,6 +5,8 @@ import {
   assetUrl,
   checkForUpdates,
   currentProjectPath,
+  deleteSymbol,
+  editSymbol,
   findDuplicateClaims,
   importSymbolToProject,
   isCEP,
@@ -15,6 +17,7 @@ import {
   publishSelectedComp,
   publishSymbolUpdate,
   readSettings,
+  relocateMaster,
   resyncRegistry,
   revokeAssetUrl,
   setLibraryRoot,
@@ -42,16 +45,27 @@ const chooseFolder = (): string | null => {
   return res && res.data && res.data.length ? res.data[0] : null;
 };
 
+/** Native .aep picker — used to relocate a symbol's moved/renamed master project. */
+const chooseProjectFile = (): string | null => {
+  const cep = (window as any).cep;
+  if (!cep || !cep.fs || !cep.fs.showOpenDialog) return null;
+  const res = cep.fs.showOpenDialog(false, false, "Locate the master project", "", ["aep"]);
+  return res && res.data && res.data.length ? res.data[0] : null;
+};
+
 const SymbolCard = ({
   symbol,
   pending,
   inProject,
   canPublish,
+  canEdit,
   conflicted,
   busy,
   onImport,
   onUpdate,
   onPublish,
+  onEdit,
+  onDelete,
 }: {
   symbol: SymbolMeta;
   pending?: PendingUpdate;
@@ -59,15 +73,22 @@ const SymbolCard = ({
   inProject: boolean;
   /** The open project is this symbol's master — the only place it may be authored. */
   canPublish: boolean;
+  /** A master project is recorded, so "Edit" has somewhere to open (§6.6). */
+  canEdit: boolean;
   /** Two comps claim this symbol — the engine refuses to publish or sync it. */
   conflicted: boolean;
   busy: boolean;
   onImport: (s: SymbolMeta) => void;
   onUpdate: (s: SymbolMeta) => void;
   onPublish: (s: SymbolMeta) => void;
+  onEdit: (s: SymbolMeta) => void;
+  onDelete: (s: SymbolMeta) => void;
 }) => {
   const video = useRef<HTMLVideoElement>(null);
   const [hover, setHover] = useState(false);
+  // Delete removes the symbol for the whole team, so it asks first — inline on
+  // the card rather than via window.confirm, which CEP can have disabled.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [posterUrl, setPosterUrl] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -103,7 +124,10 @@ const SymbolCard = ({
     <div
       className="card"
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseLeave={() => {
+        setHover(false);
+        setConfirmingDelete(false); // don't leave a half-armed delete behind
+      }}
     >
       <div className="thumb">
         {posterUrl && <img src={posterUrl} alt={symbol.name} />}
@@ -119,43 +143,87 @@ const SymbolCard = ({
         )}
         {pending && <span className="dot" title={`v${pending.toVersion} available`} />}
 
-        <div className="overlay">
-          {!inProject && (
-            <button
-              disabled={busy}
-              onClick={() => onImport(symbol)}
-              title="Import into project"
-              aria-label="Import"
-            >
-              +
-            </button>
-          )}
-          {pending && (
-            <button
-              className="primary"
-              disabled={busy || conflicted}
-              onClick={() => onUpdate(symbol)}
-              title={conflicted ? DUPLICATE_HINT : `Update to v${pending.toVersion}`}
-              aria-label="Update"
-            >
-              ↻
-            </button>
-          )}
-          {/* Master is open and current — this is where an edit becomes v(n+1). */}
-          {canPublish && !pending && (
-            <button
-              className="primary"
-              disabled={busy || conflicted}
-              onClick={() => onPublish(symbol)}
-              title={
-                conflicted
-                  ? DUPLICATE_HINT
-                  : `Publish v${symbol.currentVersion + 1} — packages this comp and saves the project`
-              }
-              aria-label="Publish"
-            >
-              ↑
-            </button>
+        {/* Kept visible mid-confirm even if the pointer drifts, so the choice
+            isn't yanked away underneath the user. */}
+        <div className={confirmingDelete ? "overlay visible" : "overlay"}>
+          {confirmingDelete ? (
+            <>
+              <span className="confirm-label">Delete for everyone?</span>
+              <button
+                className="danger"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  onDelete(symbol);
+                }}
+                title="Remove this symbol from the shared library"
+              >
+                Delete
+              </button>
+              <button disabled={busy} onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Destructive action, pushed to the far left away from the rest. */}
+              <button
+                className="danger trash"
+                disabled={busy}
+                onClick={() => setConfirmingDelete(true)}
+                title="Delete from library"
+                aria-label="Delete"
+              >
+                ✕
+              </button>
+              {canEdit && (
+                <button
+                  disabled={busy}
+                  onClick={() => onEdit(symbol)}
+                  title="Edit — open the master project"
+                  aria-label="Edit"
+                >
+                  ✎
+                </button>
+              )}
+              {!inProject && (
+                <button
+                  disabled={busy}
+                  onClick={() => onImport(symbol)}
+                  title="Import into project"
+                  aria-label="Import"
+                >
+                  +
+                </button>
+              )}
+              {pending && (
+                <button
+                  className="primary"
+                  disabled={busy || conflicted}
+                  onClick={() => onUpdate(symbol)}
+                  title={conflicted ? DUPLICATE_HINT : `Update to v${pending.toVersion}`}
+                  aria-label="Update"
+                >
+                  ↻
+                </button>
+              )}
+              {/* Master is open and current — this is where an edit becomes v(n+1). */}
+              {canPublish && !pending && (
+                <button
+                  className="primary"
+                  disabled={busy || conflicted}
+                  onClick={() => onPublish(symbol)}
+                  title={
+                    conflicted
+                      ? DUPLICATE_HINT
+                      : `Publish v${symbol.currentVersion + 1} — packages this comp and saves the project`
+                  }
+                  aria-label="Publish"
+                >
+                  ↑
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -392,6 +460,7 @@ export const App = () => {
             canPublish={
               !!inProject[symbol.symbolId] && isMasterProject(symbol, projectPath)
             }
+            canEdit={!!symbol.sourceProject}
             conflicted={!!conflictedIds[symbol.symbolId]}
             busy={busy}
             onImport={(s) =>
@@ -400,6 +469,24 @@ export const App = () => {
             onUpdate={(s) => run("Updating", () => applyUpdate(settings.libraryRoot, s.symbolId))}
             onPublish={(s) =>
               run("Publishing", () => publishSymbolUpdate(settings.libraryRoot, s.symbolId))
+            }
+            onEdit={(s) =>
+              run("Opening master", async () => {
+                let res = await editSymbol(settings.libraryRoot, s.symbolId);
+                // Stale hint: master moved/renamed. Let the user point at it, then
+                // relink so the fix sticks and retry the open in one go.
+                if (!res.ok && res.data && res.data.needsRelocate) {
+                  const picked = chooseProjectFile();
+                  if (!picked) {
+                    return { message: `Locate the master for "${s.name}" to edit it.` };
+                  }
+                  res = await relocateMaster(settings.libraryRoot, s.symbolId, picked);
+                }
+                return res;
+              })
+            }
+            onDelete={(s) =>
+              run("Deleting", () => deleteSymbol(settings.libraryRoot, s.symbolId))
             }
           />
         ))}

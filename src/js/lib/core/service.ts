@@ -20,6 +20,8 @@ import {
   hashFile,
   listSymbols,
   readManifest,
+  removeSymbol,
+  removeSymbolDir,
   upsertSymbol,
 } from "./manifest";
 import { findPendingUpdates, readRegistry, recordInstance, reconcile } from "./registry";
@@ -234,6 +236,9 @@ export const keepSymbolCopy = async (
   };
 };
 
+/** Compare project paths tolerantly of slash direction and case (Windows shares). */
+const normPath = (p: string): string => p.replace(/\\/g, "/").toLowerCase();
+
 /**
  * Is the open project the one a symbol is authored in? Symbols are authored in
  * exactly one place (ARCHITECTURE.md §6.6/§7), so this is what separates the
@@ -241,8 +246,94 @@ export const keepSymbolCopy = async (
  */
 export const isMasterProject = (meta: SymbolMeta, projectPath: string): boolean => {
   if (!meta.sourceProject || !projectPath) return false;
-  const norm = (p: string) => p.replace(/\\/g, "/").toLowerCase();
-  return norm(meta.sourceProject) === norm(projectPath);
+  return normPath(meta.sourceProject) === normPath(projectPath);
+};
+
+/**
+ * "Edit Symbol" — take the user to where the symbol is authored (ARCHITECTURE.md
+ * §6.6). A symbol's internals live in exactly one place, its master project, so
+ * editing opens that master and focuses the comp rather than letting a consumer
+ * edit a read-only linked copy in place.
+ *
+ * If the master is already the open project this only reveals the comp; otherwise
+ * it opens the master .aep first. A stale hint (master moved/renamed) comes back
+ * as `needsRelocate` so the panel can ask the user to point at the file — the
+ * relink repair of §5.1/§8.
+ */
+export const editSymbol = async (root: string, symbolId: string): Promise<FlowResult> => {
+  const meta = getSymbol(root, symbolId);
+  if (!meta) return { ok: false, message: "Symbol not in library." };
+  if (!meta.sourceProject) {
+    return {
+      ok: false,
+      message: `No master project is recorded for "${meta.name}" — publish it from its master to set one.`,
+    };
+  }
+
+  const openPath = await evalTS("getProjectPath");
+  if (!openPath || normPath(openPath) !== normPath(meta.sourceProject)) {
+    const opened = await evalTS("openMasterProject", meta.sourceProject);
+    if (!opened.ok) {
+      if (opened.error === "MASTER_NOT_FOUND") {
+        return {
+          ok: false,
+          message: `Can't find the master for "${meta.name}" at ${meta.sourceProject}.`,
+          data: { needsRelocate: true, symbolId },
+        };
+      }
+      return { ok: false, message: opened.error || "Could not open the master project." };
+    }
+  }
+
+  const revealed = await evalTS("revealSymbol", symbolId);
+  if (!revealed.ok) {
+    // The master opened but its comp wasn't found to focus — still a success for
+    // the user (they're in the right project), just note we couldn't jump to it.
+    return {
+      ok: true,
+      message: `Opened the master for "${meta.name}" — couldn't focus its comp (${revealed.error}).`,
+    };
+  }
+  return { ok: true, message: `Editing "${meta.name}" in its master project.` };
+};
+
+/**
+ * Point a symbol at a moved/renamed master and open it. Called after the panel
+ * has the user locate the file a stale `sourceProject` hint pointed at, so the
+ * fix sticks for next time (ARCHITECTURE.md §8, "Master project moved/renamed").
+ */
+export const relocateMaster = async (
+  root: string,
+  symbolId: string,
+  newPath: string
+): Promise<FlowResult> => {
+  const meta = getSymbol(root, symbolId);
+  if (!meta) return { ok: false, message: "Symbol not in library." };
+  meta.sourceProject = newPath;
+  upsertSymbol(root, meta);
+  return editSymbol(root, symbolId);
+};
+
+/**
+ * Remove a symbol from the shared library: delete its on-disk package and
+ * previews, then drop its manifest entry. Instances already imported into
+ * projects are deliberately left untouched — they are independent copies that
+ * keep working and simply stop receiving updates. Because this affects the
+ * shared drive for the whole team, the panel confirms before calling it.
+ */
+export const deleteSymbol = async (root: string, symbolId: string): Promise<FlowResult> => {
+  if (!root) return { ok: false, message: "Set a library folder first." };
+  const meta = getSymbol(root, symbolId);
+  if (!meta) return { ok: false, message: "Symbol not in library." };
+  try {
+    // Assets first, then the manifest entry — if the folder delete throws, the
+    // symbol stays listed rather than becoming a manifest ghost with no package.
+    removeSymbolDir(root, symbolId);
+    removeSymbol(root, symbolId);
+    return { ok: true, message: `Deleted "${meta.name}" from the library.` };
+  } catch (e: any) {
+    return { ok: false, message: "Delete failed: " + (e && e.message ? e.message : e) };
+  }
 };
 
 /**
