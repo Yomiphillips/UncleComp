@@ -172,7 +172,12 @@ library and drive updates:
 {
   "projectId": "…",
   "instances": {
-    "8f3c…": { "symbolId": "8f3c…", "importedVersion": 5, "compName": "Lower Third — Brand" }
+    "8f3c…": {
+      "symbolId": "8f3c…",
+      "importedVersion": 5,
+      "compName": "Lower Third — Brand",
+      "itemId": 42          // AE item id — tells the original from a duplicate (§8)
+    }
   }
 }
 ```
@@ -187,15 +192,22 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 ### 6.1 Make Symbol / Publish  (Publisher role)
 
 1. User selects a comp → **"Make Symbol"**.
-2. Engine assigns/reads `symbolId`, writes `LINKON:{id}:{version}` to the comp's `comment`.
+2. Engine assigns/reads `symbolId`, writes `LINKON:{id}:{version}` to the comp's `comment`,
+   **and saves the master project**. That save is not optional: packaging (step 3) reopens the
+   master from disk, so an unsaved tag would be lost, the next publish would mint a fresh UUID
+   at v1, and no symbol could ever reach v2 — i.e. updates would never exist.
+   Republishing overwrites `symbols/<uuid>/` in place and replaces the manifest entry; there is
+   one artifact set per symbol, and the version integer only marks who is behind.
 3. Package a **single-comp `.aep`**: duplicate the project in memory / a temp copy, `reduceProject()`
    down to the chosen comp + its dependencies, save as `symbols/<uuid>/package.aep`.
    *(reduceProject is destructive on the live project, so it runs against a saved copy — never the
    user's open project.)*
-4. Render previews at **1/4 resolution** (size-optimized). AE's Render Queue can no longer emit
-   H.264/mp4, so we render **cheap stills** in AE — a `poster.png` (`CompItem.saveFrameToPng()`) plus
-   a short PNG sequence from a quarter-size wrapper comp — and **encode the looping `preview.mp4` with
-   ffmpeg on the Node side** (high CRF, low bitrate). Keeps the loop short and small on the shared drive.
+4. Render previews **entirely inside After Effects** — no external encoder. A `poster.png` via
+   `CompItem.saveFrameToPng()`, and a short looping `preview.mp4` via the **Render Queue's H.264
+   output module**. Previews are the lowest practical resolution: a quarter-size wrapper comp with a
+   hard **480px width cap** (so 4K/8K symbols stay small), **15fps**, a **3-second cap**, draft render
+   settings, and the lowest-bitrate H.264 template found at runtime. The symbol comp itself is never
+   modified — the temporary wrapper carries the downscale and is removed afterwards.
 5. Core Service writes/updates `library.json` (bump `currentVersion`, new `contentHash`).
 
 ### 6.2 Browse & preview  (Subscriber role)
@@ -212,8 +224,12 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 
 ### 6.4 Update / Sync (the payoff)
 
-Trigger: manual "Check for updates", auto on project open, or `fs.watch` firing (v1). A
-**per-user (overridable per-project) setting** selects the update mode — see §7.
+Detection is automatic — on panel load, whenever the pointer enters the panel (a click-free,
+throttled re-scan; regaining focus and un-hiding the panel group still trigger it too), which is
+how a newly opened project is picked up since AE fires no scriptable project-open event, and on
+`fs.watch` firing when a teammate publishes. The panel deliberately does not poll the host. **Applying is
+always manual:** the panel raises out-of-date badges and the user presses **Update** on a symbol
+or **Update all**. See §7.
 
 1. Core Service diffs sidecar `importedVersion` vs manifest `currentVersion` per symbol.
 2. For each outdated symbol, Engine (inside one `beginUndoGroup`):
@@ -222,7 +238,20 @@ Trigger: manual "Check for updates", auto on project open, or `fs.watch` firing 
    c. `layer.replaceSource(newComp, /*fixExpressions*/ true)` on each — **this preserves the
       editor's per-instance transforms, effects, masks, and keyframes**; only the symbol's internal
       content changes.
-   d. Remove the old comp; update sidecar + comment version.
+   d. **Verify** no layer still sources the old comp (`AVItem.usedIn` is empty). `Item.remove()`
+      deletes the layers using an item, so a partial swap must abort *before* anything is deleted.
+   e. Retire the whole previous import — its comp, precomps, footage, solids and folder — not just
+      the comp. An import brings in the symbol's full dependency set, so removing only the comp
+      orphans the rest and the project accumulates a dead `package.aep` folder per update.
+      Each item is skipped if anything outside the retiring set still uses it, and those are
+      reported back rather than silently kept.
+   f. Update sidecar + comment version.
+
+Imports are parked in a per-symbol folder under the `LinkOn/` bin, tagged `LINKON:{id}:{version}`
+on the *folder* as well as the comp — the comp tag identifies the symbol, the folder tag is what
+lets a later update find and retire precisely that version's items. Imports predating this still
+sync correctly: their assets stay reachable from the comp, so the retiring set is derived by
+walking layer sources instead.
 3. Panel confirms what updated.
 
 ### 6.5 Propagate across many projects
@@ -243,10 +272,11 @@ Trigger: manual "Check for updates", auto on project open, or `fs.watch` firing 
 
 ## 7. Key policies & decisions baked in
 
-- **Update mode is a setting, not a fixed behavior.** Each user can choose (and override per project):
-  **(a) always auto-sync** — projects silently pull the latest on open/watch; or **(b) always prompt** —
-  show what changed and require accept before applying. Setting stored in user prefs, overridable in the
-  per-project sidecar so a delicate project can force "prompt" even for an auto-sync user.
+- **Updates are never applied automatically.** Detection is automatic; applying is not. The panel
+  badges what is out of date and the user presses **Update** or **Update all**. An auto-sync mode was
+  built and then removed: a timeline changing underneath an editor without them asking is a worse
+  failure than being one click behind, and a single always-manual path is far easier to reason about
+  than two modes. There is no update-mode setting.
 - **Symbols are locally read-only.** Editing a symbol's *internal* layers in a consumer project is
   disallowed/warned — otherwise sync would overwrite local work and identity gets ambiguous. Instance-
   level edits (position/scale/effects on the *layer* using the symbol) are fully preserved and are the
@@ -266,12 +296,16 @@ Trigger: manual "Check for updates", auto on project open, or `fs.watch` firing 
 | Nested symbols / symbol-within-symbol | Track `dependencies` in manifest; resolve update order topologically |
 | Expressions break when a source is replaced | `replaceSource(…, true)` fix-expressions flag; flag unresolved ones |
 | Symbol comment stripped or hand-edited | Manual "relink" repair flow; sidecar as secondary index |
+| **Duplicating a symbol comp** — AE copies `comment`, so the copy claims the original's `symbolId` (confirmed behaviour) | A contested symbol is never resolved by guessing: the next scan raises a conflict banner and the user picks which comp *is* the symbol, and the rest are detached in one undo group — so exactly one comp always keeps the identity (it can never be reduced to zero). Publish and sync **refuse** while a symbol is contested rather than picking by scan order — which could package a scratch copy or half-update a project |
+| Publishing saves the user's master project | Unavoidable — identity must be durable before the packaging bounce (§6.1). Surfaced in the button's tooltip; publish is an explicit, user-initiated action |
+| A consumer republishing a symbol they don't own | "Publish update" only appears when the open project *is* the symbol's `sourceProject` master (§6.6) |
 | Missing fonts / third-party effects on consumer machine | Detect + warn on import; list unmet dependencies |
 | Comp name collisions on import | Namespace imports under a `LinkOn/` bin; disambiguate by `symbolId` |
 | Two people publish the same symbol at once | Version integers + `contentHash`; last-write detection, later a lock (v2) |
 | Master project moved/renamed | Library store is the source of truth, not the master path; store path only as a hint |
 | Large master → slow packaging | `reduceProject` to just the symbol + deps keeps packages small |
-| AE Render Queue can't emit mp4 | Render stills in AE (`saveFrameToPng`); encode preview mp4 with ffmpeg on the Node side |
+| H.264 output module missing/renamed across AE versions or locales | Discover templates at runtime and pick the lowest bitrate; report clearly if none exists |
+| Preview render disturbing the user's Render Queue | Queued items are un-queued around our render and restored afterwards |
 | **CEP deprecation over time** | Engine/UI separation lets a UXP front-end replace CEP later (§3, §9) |
 
 ---
@@ -283,9 +317,8 @@ Runnable throwaway tests now live in [`spike/`](spike/) (run instructions in [`s
 - **`01_replace_source_fidelity.jsx`** — the critical one: `replaceSource()` swap that **preserves** an
   instance's transforms, keyframes, effects, masks, trim, and stretch.
 - **`02_package_and_reimport.jsx`** — UUID-in-`comment` survives `reduceProject` → single-comp `.aep` → re-import.
-- **`03_poster_and_preview.jsx`** — `saveFrameToPng` poster + 1/4-res PNG sequence.
+- **`03_poster_and_preview.jsx`** — `saveFrameToPng` poster + 1/4-res stills.
 - **`node/fs-watch-test.js`** — atomic manifest write + `fs.watch` (Core Service assumptions).
-- **`node/assemble-preview.js`** — ffmpeg encodes the PNG sequence → small looping `preview.mp4`.
 > Exit criteria: a scripted round-trip (publish → import → edit master → re-package → swap) works and
 > the consumer's layout survives. If `replaceSource` fidelity is insufficient, revisit before building UI.
 
@@ -296,15 +329,14 @@ symlinked into AE's extensions folder. Remaining Phase 1 work is noted per item 
 - **Make Symbol** (publish: UUID, package, **1/4-res looping `preview.mp4` + poster**, manifest write).
 - **Media browser** (grid, poster thumbnails, hover-plays the loop, search).
 - **Import/Link** into current project (bin, tag, sidecar register).
-- **Update modes** setting from day one: **auto-sync** or **prompt-before-update** (§7); manual
-  "Check for updates" always available.
+- **User-initiated updates** (§7): badges appear on their own, **Update** / **Update all** apply them.
 - **Shared-drive safety:** atomic manifest writes (write-temp-then-rename) so concurrent readers
   never see a half-written `library.json`.
 > Deliverable: a small team can symbol-ize comps to a network share, browse/preview them, import
-> elsewhere, and update via their chosen mode.
+> elsewhere, and update when they choose to.
 
-### Phase 2 — v1 (auto-sync + robustness)
-- `fs.watch` on the share for live update badges; auto-check on project open.
+### Phase 2 — v1 (robustness)
+- ✅ `fs.watch` on the share for live update badges; re-check when the pointer enters the panel (or it regains focus).
 - Nested-symbol dependency resolution (topological update).
 - **Publish concurrency:** manifest locking / optimistic-version checks so two editors publishing
   at once can't clobber each other on the shared drive.
@@ -324,8 +356,9 @@ symlinked into AE's extensions folder. Remaining Phase 1 work is noted per item 
 **Locked:**
 1. **Team / storage** — small team on a **shared network drive** (folder-based, with atomic writes now
    and publish locking in v1). Server/cloud deferred to v2.
-2. **Sync trust** — **both, as a setting:** auto-sync *or* prompt-before-update, per user and
-   overridable per project.
+2. **Sync trust** — **always user-initiated.** Detection is automatic, applying never is. *(Revised:
+   this was originally "both, as a setting". Auto-sync was built, then removed — a mode that changes
+   a timeline without being asked isn't worth the second code path. See §7.)*
 3. **Preview** — **short looping video at 1/4 resolution**, size-optimized, from the MVP.
 4. **AE version** — **latest only (2024/2025)**.
 5. **"Edit the symbol" path** — editing a symbol **always opens the master project**. No local

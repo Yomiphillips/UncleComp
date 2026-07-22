@@ -1,14 +1,16 @@
 /**
  * LinkOn Engine — publishing (ARCHITECTURE.md §6.1).
  *
- * "Make Symbol" only stamps identity — it is cheap and safe to run on the
- * selected comp. Packaging is separate because `reduceProject()` is destructive,
- * so it must be handled deliberately (see `packageSymbol` below).
+ * "Make Symbol" stamps identity into the comp's comment and saves the master, so
+ * the symbol's UUID and version survive the session bounce that packaging causes.
+ * Packaging is separate because `reduceProject()` is destructive, so it must be
+ * handled deliberately (see `packageSymbol` below).
  */
 
 import { EngineResult, parseTag } from "../../../shared/linkon-types";
 import {
   generateSymbolId,
+  duplicateClaimError,
   findSymbolComp,
   writeSymbolTag,
   getProjectPath,
@@ -26,27 +28,54 @@ const targetComp = (): CompItem | null => {
 };
 
 /**
- * Turn the selected comp into a symbol (or bump an existing one).
+ * Turn a comp into a symbol (or bump an existing one).
+ *
+ * Pass `symbolId` to republish a specific symbol regardless of what is selected
+ * in AE — that is the "Publish update" path. Omit it to symbolise the selection.
+ *
  * Idempotent: re-running on an already-tagged comp keeps its UUID and bumps version.
  */
-export const makeSymbol = (): EngineResult => {
+export const makeSymbol = (symbolId?: string): EngineResult => {
   app.beginUndoGroup("LinkOn: make symbol");
   try {
-    var comp = targetComp();
+    var comp = symbolId ? findSymbolComp(symbolId) : targetComp();
     if (!comp) {
-      return { ok: false, error: "Select a composition first." };
+      return {
+        ok: false,
+        error: symbolId
+          ? "That symbol's comp isn't in this project — open its master to publish an update."
+          : "Select a composition first.",
+      };
+    }
+    if (!app.project.file) {
+      return { ok: false, error: "Save the master project before publishing." };
     }
 
     var existing = parseTag(comp.comment);
-    var symbolId = existing ? existing.symbolId : generateSymbolId();
+
+    // Never publish while two comps claim the id: the "right" one would be
+    // picked by scan order, so a scratch duplicate could be packaged and shipped.
+    if (existing) {
+      var ambiguous = duplicateClaimError(existing.symbolId);
+      if (ambiguous) return { ok: false, error: ambiguous };
+    }
+
+    var id = existing ? existing.symbolId : generateSymbolId();
     var version = existing ? existing.version + 1 : 1;
-    writeSymbolTag(comp, symbolId, version);
+    writeSymbolTag(comp, id, version);
+
+    // The tag MUST be durable before packaging: packageSymbol Save-As'es the
+    // session elsewhere and then reopens this project from disk. An in-memory
+    // tag would be lost in that bounce, so the next publish would see an
+    // untagged comp, mint a fresh UUID at v1, and no symbol could ever reach v2.
+    app.project.save();
 
     return {
       ok: true,
       data: {
-        symbolId: symbolId,
+        symbolId: id,
         version: version,
+        itemId: comp.id, // lets a later scan tell this comp from a duplicate
         name: comp.name,
         width: comp.width,
         height: comp.height,

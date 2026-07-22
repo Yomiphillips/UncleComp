@@ -1,26 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { subscribeBackgroundColor } from "../lib/utils/bolt";
 import {
   applyAllUpdates,
   applyUpdate,
+  assetUrl,
   checkForUpdates,
-  fileUrl,
+  currentProjectPath,
+  findDuplicateClaims,
   importSymbolToProject,
   isCEP,
+  isMasterProject,
+  keepSymbolCopy,
+  listProjectSymbols,
   loadLibrary,
   publishSelectedComp,
+  publishSymbolUpdate,
   readSettings,
   resyncRegistry,
+  revokeAssetUrl,
   setLibraryRoot,
-  setUpdateMode,
   watchLibrary,
 } from "../lib/core";
+import type { DuplicateClaim } from "../lib/core";
 import type {
   LinkOnSettings,
   PendingUpdate,
   SymbolMeta,
 } from "../../shared/linkon-types";
 import "./main.scss";
+
+const DUPLICATE_HINT =
+  "Two comps claim this symbol — resolve the duplicate above before publishing or updating.";
+
+/** Shortest gap between hover-triggered re-scans; each one round-trips into AE. */
+const HOVER_RESCAN_COOLDOWN_MS = 1500;
 
 /** Native folder picker; CEP exposes this on window.cep.fs. */
 const chooseFolder = (): string | null => {
@@ -33,18 +45,47 @@ const chooseFolder = (): string | null => {
 const SymbolCard = ({
   symbol,
   pending,
+  inProject,
+  canPublish,
+  conflicted,
   busy,
   onImport,
   onUpdate,
+  onPublish,
 }: {
   symbol: SymbolMeta;
   pending?: PendingUpdate;
+  /** This symbol's comp exists in the open project (imported copy or master). */
+  inProject: boolean;
+  /** The open project is this symbol's master — the only place it may be authored. */
+  canPublish: boolean;
+  /** Two comps claim this symbol — the engine refuses to publish or sync it. */
+  conflicted: boolean;
   busy: boolean;
   onImport: (s: SymbolMeta) => void;
   onUpdate: (s: SymbolMeta) => void;
+  onPublish: (s: SymbolMeta) => void;
 }) => {
   const video = useRef<HTMLVideoElement>(null);
   const [hover, setHover] = useState(false);
+  const [posterUrl, setPosterUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  // Re-read on `updatedAt` so a republish shows the new frame rather than the
+  // cached one — the path is identical across versions.
+  useEffect(() => {
+    const url = assetUrl(symbol.poster);
+    setPosterUrl(url);
+    return () => revokeAssetUrl(url);
+  }, [symbol.poster, symbol.updatedAt]);
+
+  // Previews are ~250KB each; only pay for the ones actually hovered.
+  useEffect(() => {
+    if (!hover || !symbol.preview) return;
+    const url = assetUrl(symbol.preview);
+    setPreviewUrl(url);
+    return () => revokeAssetUrl(url);
+  }, [hover, symbol.preview, symbol.updatedAt]);
 
   // Only play on hover — a grid of autoplaying loops is unreadable and costly.
   useEffect(() => {
@@ -56,7 +97,7 @@ const SymbolCard = ({
       el.pause();
       el.currentTime = 0;
     }
-  }, [hover]);
+  }, [hover, previewUrl]);
 
   return (
     <div
@@ -65,54 +106,95 @@ const SymbolCard = ({
       onMouseLeave={() => setHover(false)}
     >
       <div className="thumb">
-        {symbol.poster && <img src={fileUrl(symbol.poster)} alt={symbol.name} />}
-        {symbol.preview && (
+        {posterUrl && <img src={posterUrl} alt={symbol.name} />}
+        {previewUrl && (
           <video
             ref={video}
             className={hover ? "visible" : ""}
-            src={fileUrl(symbol.preview)}
+            src={previewUrl}
             muted
             loop
             playsInline
           />
         )}
-        {pending && <span className="badge">v{pending.toVersion}</span>}
+        {pending && <span className="dot" title={`v${pending.toVersion} available`} />}
+
+        <div className="overlay">
+          {!inProject && (
+            <button
+              disabled={busy}
+              onClick={() => onImport(symbol)}
+              title="Import into project"
+              aria-label="Import"
+            >
+              +
+            </button>
+          )}
+          {pending && (
+            <button
+              className="primary"
+              disabled={busy || conflicted}
+              onClick={() => onUpdate(symbol)}
+              title={conflicted ? DUPLICATE_HINT : `Update to v${pending.toVersion}`}
+              aria-label="Update"
+            >
+              ↻
+            </button>
+          )}
+          {/* Master is open and current — this is where an edit becomes v(n+1). */}
+          {canPublish && !pending && (
+            <button
+              className="primary"
+              disabled={busy || conflicted}
+              onClick={() => onPublish(symbol)}
+              title={
+                conflicted
+                  ? DUPLICATE_HINT
+                  : `Publish v${symbol.currentVersion + 1} — packages this comp and saves the project`
+              }
+              aria-label="Publish"
+            >
+              ↑
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="meta">
-        <span className="name" title={symbol.name}>
+        <span
+          className="name"
+          title={`${symbol.name} · v${symbol.currentVersion} · ${symbol.width}×${symbol.height}`}
+        >
           {symbol.name}
         </span>
-        <span className="sub">
-          v{symbol.currentVersion} · {symbol.width}×{symbol.height}
-        </span>
-      </div>
-
-      <div className="actions">
-        <button disabled={busy} onClick={() => onImport(symbol)}>
-          Import
-        </button>
-        {pending && (
-          <button className="primary" disabled={busy} onClick={() => onUpdate(symbol)}>
-            Update
-          </button>
-        )}
+        <span className="ver">v{symbol.currentVersion}</span>
       </div>
     </div>
   );
 };
 
 export const App = () => {
-  const [bgColor, setBgColor] = useState("#1e1f22");
-  const [settings, setSettings] = useState<LinkOnSettings>({
-    libraryRoot: "",
-    updateMode: "prompt",
-  });
+  const [settings, setSettings] = useState<LinkOnSettings>({ libraryRoot: "" });
   const [symbols, setSymbols] = useState<SymbolMeta[]>([]);
   const [pending, setPending] = useState<PendingUpdate[]>([]);
+  const [inProject, setInProject] = useState<{ [id: string]: boolean }>({});
+  const [duplicates, setDuplicates] = useState<DuplicateClaim[]>([]);
+  const [projectPath, setProjectPath] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  // Read inside the watcher callback, which closes over a stale `busy`.
+  const busyRef = useRef(false);
+  busyRef.current = busy;
+  // When we last re-scanned, so a hover re-scan can skip if one just ran —
+  // otherwise darting the pointer in and out round-trips into AE every crossing.
+  const lastScanRef = useRef(0);
+
+  const conflictedIds = useMemo(() => {
+    const map: { [id: string]: boolean } = {};
+    duplicates.forEach((d) => (map[d.symbolId] = true));
+    return map;
+  }, [duplicates]);
 
   const pendingById = useMemo(() => {
     const map: { [id: string]: PendingUpdate } = {};
@@ -130,31 +212,72 @@ export const App = () => {
     if (!root) return;
     setSymbols(loadLibrary(root));
     try {
-      setPending(await checkForUpdates(root));
+      const instances = await listProjectSymbols();
+      const open = await currentProjectPath();
+      setProjectPath(open);
+
+      // A duplicated comp arrives already claiming the original's identity,
+      // because AE copies the comment too. Rather than guess which comp is the
+      // "real" symbol and silently strip the other, every conflict is raised to
+      // the user, who chooses which comp to keep (see the duplicate banner
+      // below). Publish and sync stay refused until then.
+      setDuplicates(findDuplicateClaims(instances));
+
+      const present: { [id: string]: boolean } = {};
+      instances.forEach((i) => (present[i.symbolId] = true));
+      setInProject(present);
+      setPending(await checkForUpdates(root, instances));
     } catch {
       // No AE host (browser dev) — the library still renders.
+    } finally {
+      lastScanRef.current = Date.now();
     }
   }, []);
 
+  // Moving the pointer onto the panel is already a reliable "I'm about to use
+  // this — show me the current project" signal, and it needs no click. Throttled
+  // so it re-scans at most once per cooldown: mouseenter can fire repeatedly as
+  // the pointer grazes the panel edge, and each scan round-trips into AE.
+  const rescanOnHover = useCallback(() => {
+    if (busyRef.current) return; // never re-read mid-flow
+    if (!settings.libraryRoot) return;
+    if (Date.now() - lastScanRef.current < HOVER_RESCAN_COOLDOWN_MS) return;
+    refresh(settings.libraryRoot);
+  }, [settings.libraryRoot, refresh]);
+
   useEffect(() => {
-    if (isCEP()) subscribeBackgroundColor(setBgColor);
     const loaded = readSettings();
     setSettings(loaded);
-    if (loaded.libraryRoot) {
-      refresh(loaded.libraryRoot).then(async () => {
-        if (loaded.updateMode === "auto") {
-          const res = await applyAllUpdates(loaded.libraryRoot);
-          setStatus(res.message);
-          refresh(loaded.libraryRoot);
-        }
-      });
-    }
+    if (loaded.libraryRoot) refresh(loaded.libraryRoot);
   }, [refresh]);
 
-  // Live badges: a teammate's publish lands as a manifest write on the share.
+  // AE exposes no scriptable "project opened" event. Rather than poll the host,
+  // the panel also re-reads when it regains focus or is re-shown in a docked
+  // group — the hover re-scan above covers the common case without a click, and
+  // these catch the rest (alt-tabbing back, un-hiding the panel group).
+  useEffect(() => {
+    if (!settings.libraryRoot) return;
+    const resync = () => {
+      if (busyRef.current) return; // never re-read mid-flow
+      if (document.hidden) return; // the hide half of visibilitychange
+      refresh(settings.libraryRoot);
+    };
+    window.addEventListener("focus", resync);
+    document.addEventListener("visibilitychange", resync);
+    return () => {
+      window.removeEventListener("focus", resync);
+      document.removeEventListener("visibilitychange", resync);
+    };
+  }, [settings.libraryRoot, refresh]);
+
+  // A teammate's publish lands as a manifest write on the share, which raises the
+  // out-of-date badges. Nothing is ever applied without the user asking.
   useEffect(() => {
     if (!settings.libraryRoot || !isCEP()) return;
-    const watcher = watchLibrary(settings.libraryRoot, () => refresh(settings.libraryRoot));
+    const watcher = watchLibrary(settings.libraryRoot, () => {
+      if (busyRef.current) return; // never re-read mid-flow
+      refresh(settings.libraryRoot);
+    });
     return () => watcher.close();
   }, [settings.libraryRoot, refresh]);
 
@@ -179,65 +302,76 @@ export const App = () => {
     refresh(folder);
   };
 
-  const toggleMode = () => {
-    const next = settings.updateMode === "auto" ? "prompt" : "auto";
-    setSettings(setUpdateMode(next));
-    setStatus(
-      next === "auto"
-        ? "Auto-sync on: projects pull the latest automatically."
-        : "Prompt mode on: you approve every update."
-    );
-  };
-
   if (!settings.libraryRoot) {
     return (
-      <div className="app setup" style={{ backgroundColor: bgColor }}>
-        <h1>LinkOn</h1>
-        <p>
-          Choose the shared folder your team uses as the symbol library. It will hold{" "}
-          <code>library.json</code> plus each symbol's package and preview.
-        </p>
+      <div className="app setup">
+        <span className="wordmark">LinkOn</span>
+        <p>Point LinkOn at the shared folder your team uses as the symbol library.</p>
         <button className="primary" onClick={pickLibrary}>
-          Choose library folder
+          Choose folder
         </button>
       </div>
     );
   }
 
   return (
-    <div className="app" style={{ backgroundColor: bgColor }}>
+    <div className="app" onMouseEnter={rescanOnHover}>
       <header>
         <div className="row">
-          <strong>LinkOn</strong>
+          <span className="wordmark">LinkOn</span>
           <span className="spacer" />
-          <button onClick={toggleMode} title="How updates reach your projects">
-            {settings.updateMode === "auto" ? "Auto-sync" : "Prompt"}
-          </button>
           <button onClick={pickLibrary} title={settings.libraryRoot}>
-            Library…
+            Library
           </button>
         </div>
         <div className="row">
           <input
-            placeholder="Search symbols"
+            placeholder="Search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button
-            className="primary"
+            className="primary new"
             disabled={busy}
+            title="Make a symbol from the selected comp"
+            aria-label="Make symbol"
             onClick={() => run("Publishing", () => publishSelectedComp(settings.libraryRoot))}
           >
-            Make Symbol
+            +
           </button>
         </div>
       </header>
 
+      {/* Duplicating a comp copies its LinkOn identity, so two comps now claim
+          one symbol. We never guess which is the real one — the engine refuses to
+          publish or sync until the user picks. Choosing which to keep detaches
+          the rest, so exactly one comp always carries the symbol. */}
+      {duplicates.map((dup) => (
+        <div className="banner warn" key={dup.symbolId}>
+          <span>
+            {dup.claimants.length} conflicts “{dup.name}”. Which one is the
+            right symbol?
+          </span>
+          {dup.claimants.map((claimant) => (
+            <button
+              key={claimant.itemId}
+              disabled={busy}
+              title={`Keep "${claimant.compName}" as the symbol and detach the other copies`}
+              onClick={() =>
+                run("Resolving", () =>
+                  keepSymbolCopy(dup.symbolId, claimant.itemId, claimant.compName)
+                )
+              }
+            >
+              Keep “{claimant.compName}”
+            </button>
+          ))}
+        </div>
+      ))}
+
       {pending.length > 0 && (
         <div className="banner">
-          <span>
-            {pending.length} symbol{pending.length > 1 ? "s" : ""} out of date
-          </span>
+          <span>{pending.length} out of date</span>
           <button
             className="primary"
             disabled={busy}
@@ -254,18 +388,26 @@ export const App = () => {
             key={symbol.symbolId}
             symbol={symbol}
             pending={pendingById[symbol.symbolId]}
+            inProject={!!inProject[symbol.symbolId]}
+            canPublish={
+              !!inProject[symbol.symbolId] && isMasterProject(symbol, projectPath)
+            }
+            conflicted={!!conflictedIds[symbol.symbolId]}
             busy={busy}
             onImport={(s) =>
               run("Importing", () => importSymbolToProject(settings.libraryRoot, s.symbolId))
             }
             onUpdate={(s) => run("Updating", () => applyUpdate(settings.libraryRoot, s.symbolId))}
+            onPublish={(s) =>
+              run("Publishing", () => publishSymbolUpdate(settings.libraryRoot, s.symbolId))
+            }
           />
         ))}
         {!visible.length && (
           <p className="empty">
             {symbols.length
-              ? "No symbols match your search."
-              : "No symbols yet — select a comp and choose Make Symbol."}
+              ? "No matches."
+              : "No symbols yet — select a comp and press +."}
           </p>
         )}
       </main>

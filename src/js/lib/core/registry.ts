@@ -76,17 +76,22 @@ export const findPendingUpdates = (
   instances: SymbolInstanceInfo[],
   manifest: LibraryManifest
 ): PendingUpdate[] => {
-  const pending: PendingUpdate[] = [];
+  // Keyed by symbolId, because a duplicated comp puts the same symbol in the
+  // list twice — which would otherwise double-count the "N out of date" badge
+  // and run the same sync twice under Update all. Lowest version wins: it is the
+  // one furthest behind, so it describes the work still to do.
+  const worst: { [symbolId: string]: PendingUpdate } = {};
   instances.forEach((inst) => {
     const meta = manifest.symbols[inst.symbolId];
-    if (meta && meta.currentVersion > inst.version) {
-      pending.push({
-        symbolId: inst.symbolId,
-        name: meta.name,
-        fromVersion: inst.version,
-        toVersion: meta.currentVersion,
-      });
-    }
+    if (!meta || meta.currentVersion <= inst.version) return;
+    const seen = worst[inst.symbolId];
+    if (seen && seen.fromVersion <= inst.version) return;
+    worst[inst.symbolId] = {
+      symbolId: inst.symbolId,
+      name: meta.name,
+      fromVersion: inst.version,
+      toVersion: meta.currentVersion,
+    };
   });
-  return pending;
+  return Object.keys(worst).map((id) => worst[id]);
 };

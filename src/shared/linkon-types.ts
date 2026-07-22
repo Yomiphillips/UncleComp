@@ -33,6 +33,19 @@ export function parseTag(comment: string): SymbolTag | null {
   return { symbolId: m[1], version: parseInt(m[2], 10) };
 }
 
+/**
+ * Drop the identity tag, keeping anything else the user wrote in the comment.
+ *
+ * Needed because After Effects copies a comp's `comment` when the comp is
+ * duplicated — so a duplicate arrives already claiming the original's identity,
+ * and detaching it is the only way to make the project unambiguous again.
+ */
+export function stripTag(comment: string): string {
+  if (!comment) return "";
+  var without = comment.replace(/LINKON:[0-9a-fA-F\-]+:[0-9]+/, "");
+  return without.replace(/^\s+/, "").replace(/\s+$/, ""); // no String.trim in ES3
+}
+
 /** One published symbol, as recorded in the library manifest. */
 export interface SymbolMeta {
   symbolId: string;
@@ -66,6 +79,13 @@ export interface ProjectInstance {
   symbolId: string;
   importedVersion: number;
   compName: string;
+  /**
+   * AE item id of the comp we registered. This is what tells the original apart
+   * from a duplicate: duplicating a comp copies its `comment` (and so its
+   * symbolId), but AE always assigns the copy a fresh item id. Optional because
+   * sidecars written before this existed won't have it.
+   */
+  itemId?: number;
 }
 
 /** `<project>.linkon.json` sidecar — a cache; always re-derivable by scanning comments. */
@@ -74,12 +94,13 @@ export interface ProjectRegistry {
   instances: { [symbolId: string]: ProjectInstance };
 }
 
-/** Update behaviour is a user setting, overridable per project (ARCHITECTURE.md §7). */
-export type UpdateMode = "auto" | "prompt";
-
+/**
+ * Updates are always user-initiated — the panel raises badges, the user presses
+ * Update or Update all. There is deliberately no auto-apply mode: a timeline
+ * should never change underneath an editor without them asking (ARCHITECTURE.md §7).
+ */
 export interface LinkOnSettings {
   libraryRoot: string;
-  updateMode: UpdateMode;
 }
 
 /** A linked symbol discovered in the currently open project. */

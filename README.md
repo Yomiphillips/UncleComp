@@ -14,8 +14,10 @@ design and roadmap.
 
 - **After Effects 2024 or 2025** (the only supported targets)
 - **Node.js 18+**
-- **ffmpeg** on your PATH — used to encode preview loops (AE's Render Queue cannot emit mp4)
 - CEP `PlayerDebugMode` enabled, so AE will load an unsigned dev panel
+
+No external encoder is needed — posters and preview loops are rendered by After Effects itself
+via `saveFrameToPng` and the Render Queue's H.264 output module.
 
 ## Getting started
 
@@ -59,16 +61,16 @@ src/
       publish.ts           Make Symbol + reduceProject packaging
       importer.ts          Import a package, read its identity back
       sync.ts              replaceSource() swap — the update mechanic
-      preview.ts           Poster + quarter-res frame rendering
+      cleanup.ts           Retire a superseded import, guarded by usedIn
+      preview.ts           Poster + low-res H.264 preview via the Render Queue
       edit.ts              Open the master project to author a symbol
 
   js/lib/core/             CORE SERVICE — the stateful brain (Node, inside CEP)
     paths.ts               Library layout on the shared drive
     manifest.ts            library.json, atomic writes, content hashing
     registry.ts            Per-project sidecar + pending-update diffing
-    settings.ts            Library root + update mode (auto / prompt)
+    settings.ts            Library root
     watcher.ts             fs.watch on the share → live update badges
-    encoder.ts             ffmpeg: PNG frames → small looping preview.mp4
     service.ts             Flow orchestration (publish / import / sync)
 
   js/main/                 PANEL UI — the media browser

@@ -10,6 +10,8 @@
 export {
   generateSymbolId,
   findSymbolComp,
+  findSymbolComps,
+  keepSymbolComp,
   listSymbolInstances,
   getProjectPath,
 } from "./linkon/identity";
@@ -20,7 +22,7 @@ export { importSymbol } from "./linkon/importer";
 
 export { syncSymbol, previewSymbolUpdate, findLayersUsingItem } from "./linkon/sync";
 
-export { renderPoster, renderPreviewFrames } from "./linkon/preview";
+export { renderPoster, renderPreview } from "./linkon/preview";
 
 export { openMasterProject, revealSymbol } from "./linkon/edit";
 

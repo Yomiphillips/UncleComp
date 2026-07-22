@@ -1,62 +1,86 @@
 @use "../variables.scss" as *;
 
-// Panel chrome tracks the host app's theme (subscribeBackgroundColor sets the
-// background inline), so colours here stay neutral and translucent.
-$border: rgba(255, 255, 255, 0.12);
-$muted: rgba(255, 255, 255, 0.55);
+// Fixed palette: black panel, white type, one red accent. Flat surfaces,
+// square corners, hairline borders — no translucency, no chrome.
+$red: #c75050;
+$red-hover: #d55f5f;
+$black: #131313;
+$ink: #f2f2f2;
+$muted: #8c8c8c;
+$line: #2c2c2c;
 
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  color: #e8e8e8;
-  font: 12px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: $black;
+  color: $ink;
+  font: 12px/1.5 "Segoe UI", system-ui, sans-serif;
   overflow: hidden;
 
   button {
-    padding: 4px 10px;
-    border: 1px solid $border;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
+    padding: 5px 12px;
+    border: 1px solid $line;
+    border-radius: 0;
+    background: none;
     color: inherit;
     font-size: 11px;
     cursor: pointer;
 
-    &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
-    &:disabled { opacity: 0.4; cursor: default; }
+    &:hover:not(:disabled) { border-color: $ink; }
+    &:disabled { opacity: 0.35; cursor: default; }
 
     &.primary {
-      background: #4b7fd6;
-      border-color: #4b7fd6;
-      &:hover:not(:disabled) { background: #5a8de3; }
+      background: $red;
+      border-color: $red;
+      color: #fff;
+      &:hover:not(:disabled) { background: $red-hover; border-color: $red-hover; }
     }
   }
 
   input {
     flex: 1;
-    padding: 4px 8px;
-    border: 1px solid $border;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, 0.25);
+    padding: 5px 0;
+    border: 0;
+    border-bottom: 1px solid $line;
+    background: none;
     color: inherit;
-    font-size: 11px;
+    font-size: 12px;
+    outline: none;
     &::placeholder { color: $muted; }
+    &:focus { border-bottom-color: $ink; }
   }
 }
 
 .spacer { flex: 1; }
 
+.wordmark {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  border-bottom: 1px solid $border;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid $line;
 
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
+  }
+
+  // The one square red button in the chrome: "+" makes a symbol.
+  .new {
+    width: 30px;
+    height: 26px;
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
   }
 }
 
@@ -64,32 +88,31 @@ header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  background: rgba(75, 127, 214, 0.18);
-  border-bottom: 1px solid $border;
+  padding: 8px 12px;
+  border-bottom: 1px solid $line;
+  border-left: 2px solid $red;
   span { flex: 1; }
+
+  // Needs arbitrating rather than just acting on — buttons wrap below the text.
+  &.warn { flex-wrap: wrap; }
 }
 
 .grid {
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  padding: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 16px;
   align-content: start;
 }
 
 .card {
-  border: 1px solid $border;
-  border-radius: 6px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.2);
-
   .thumb {
     position: relative;
     aspect-ratio: 16 / 9;
-    background: rgba(0, 0, 0, 0.45);
+    background: #000;
+    border: 1px solid $line;
 
     img,
     video {
@@ -107,44 +130,64 @@ header {
       &.visible { opacity: 1; }
     }
 
-    .badge {
+    // An update is waiting — a mark, not a message. The tooltip carries the version.
+    .dot {
       position: absolute;
-      top: 4px;
-      right: 4px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      background: #4b7fd6;
-      font-size: 10px;
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      background: $red;
+    }
+
+    // Glyph actions surface over the image on hover or keyboard focus.
+    .overlay {
+      position: absolute;
+      inset: auto 0 0 0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      padding: 6px;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+
+      button {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        background: $black;
+        font-size: 14px;
+        line-height: 1;
+        &.primary { background: $red; }
+      }
     }
   }
 
+  &:hover .thumb .overlay,
+  &:focus-within .thumb .overlay { opacity: 1; }
+
   .meta {
     display: flex;
-    flex-direction: column;
-    padding: 6px 8px 4px;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 1px 0;
 
     .name {
+      flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .sub {
+    .ver {
       color: $muted;
       font-size: 10px;
     }
-  }
-
-  .actions {
-    display: flex;
-    gap: 4px;
-    padding: 0 8px 8px;
-    button { flex: 1; }
   }
 }
 
 .empty {
   grid-column: 1 / -1;
-  padding: 24px 8px;
+  padding: 40px 8px;
   color: $muted;
   text-align: center;
 }
@@ -153,29 +196,35 @@ footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
-  border-top: 1px solid $border;
+  padding: 6px 12px;
+  border-top: 1px solid $line;
 
   .status {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: $muted;
+    font-size: 11px;
+  }
+
+  button {
+    border: 0;
+    padding: 2px 0;
+    color: $muted;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    &:hover:not(:disabled) { color: $ink; }
   }
 }
 
 .setup {
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   padding: 24px;
   text-align: center;
 
-  h1 { font-size: 20px; }
-  p { max-width: 340px; color: $muted; }
-  code {
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: rgba(255, 255, 255, 0.1);
-  }
+  .wordmark { font-size: 14px; }
+  p { max-width: 300px; color: $muted; }
 }

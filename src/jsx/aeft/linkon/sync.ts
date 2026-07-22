@@ -8,8 +8,14 @@
  */
 
 import { EngineResult } from "../../../shared/linkon-types";
-import { findSymbolComp, writeSymbolTag } from "./identity";
-import { importSymbolPackage } from "./importer";
+import { duplicateClaimError, findSymbolComp, writeSymbolTag } from "./identity";
+import { importSymbolPackage, organiseImport } from "./importer";
+import {
+  collectDependencies,
+  collectFolder,
+  findSymbolFolder,
+  removeRetiredItems,
+} from "./cleanup";
 
 /** Where a symbol is instanced, for reporting what an update will touch. */
 export interface LayerRef {
@@ -66,8 +72,13 @@ export const previewSymbolUpdate = (symbolId: string): EngineResult => {
 
 /**
  * Pull a newer version of a symbol into the open project.
- * Import the new package, repoint every instance, drop the stale comp, re-tag.
- * Wrapped in a single undo group so the whole sync is one Cmd/Ctrl+Z.
+ *
+ * Import the new package, repoint every instance, *verify* nothing still points
+ * at the old version, then retire the whole old import — comp, precomps, footage
+ * and its folder — rather than only the comp. Order matters: `Item.remove()`
+ * takes the layers using an item down with it, so deletion only ever happens
+ * after the swap is proven complete. Wrapped in one undo group, so a sync the
+ * user dislikes is a single Cmd/Ctrl+Z.
  */
 export const syncSymbol = (
   symbolId: string,
@@ -76,25 +87,66 @@ export const syncSymbol = (
 ): EngineResult => {
   app.beginUndoGroup("LinkOn: sync symbol");
   try {
+    // Before anything is imported or deleted: refuse a swap we can't aim.
+    // Updating one of two identical claimants would leave the other's layers
+    // silently stranded on the old version.
+    var ambiguous = duplicateClaimError(symbolId);
+    if (ambiguous) return { ok: false, error: ambiguous };
+
     var oldComp = findSymbolComp(symbolId);
     if (!oldComp) {
       return { ok: false, error: "Symbol not present in this project." };
     }
     var oldName = oldComp.name;
+    // Captured before the import, so it can never resolve to the incoming folder.
+    var oldFolder = findSymbolFolder(symbolId);
 
-    var incoming = importSymbolPackage(packagePath, symbolId);
-    if (!incoming) {
+    var imported = importSymbolPackage(packagePath, symbolId);
+    if (!imported) {
       return { ok: false, error: "Could not import package: " + packagePath };
     }
+    var incoming = imported.comp;
 
     var swapped = swapSymbolSource(oldComp, incoming);
-    oldComp.remove();
+
+    // The safety gate: if anything still sources the old comp, the swap missed
+    // it, and deleting now would delete those layers too. Bail with the list.
+    var stragglers = oldComp.usedIn;
+    if (stragglers && stragglers.length > 0) {
+      var names: string[] = [];
+      for (var s = 0; s < stragglers.length; s++) names.push(stragglers[s].name);
+      return {
+        ok: false,
+        error:
+          'Aborted: "' +
+          oldName +
+          '" is still used by ' +
+          names.join(", ") +
+          " after the swap. Nothing was deleted — undo to discard the new import.",
+      };
+    }
 
     // Keep the familiar name so the user's bins/timelines read the same.
     incoming.name = oldName;
     writeSymbolTag(incoming, symbolId, newVersion);
+    organiseImport(imported, symbolId, newVersion, oldName);
 
-    return { ok: true, data: { swapped: swapped, version: newVersion } };
+    // Retire the previous version: its own folder when it has one, otherwise
+    // everything reachable from the comp (imports made before symbols were
+    // foldered scatter their assets, but they stay reachable).
+    var retiring = oldFolder ? collectFolder(oldFolder) : collectDependencies(oldComp);
+    var cleanup = removeRetiredItems(retiring);
+
+    return {
+      ok: true,
+      data: {
+        swapped: swapped,
+        version: newVersion,
+        itemId: incoming.id,
+        removed: cleanup.removed,
+        kept: cleanup.kept,
+      },
+    };
   } catch (e) {
     return { ok: false, error: String(e) };
   } finally {
