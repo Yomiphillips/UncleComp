@@ -1,5 +1,5 @@
 /**
- * LinkOn Core Service — per-project registry (ARCHITECTURE.md §5.3).
+ * uncleComp Core Service — per-project registry (ARCHITECTURE.md §5.3).
  *
  * The sidecar records which symbols a working project uses and at what version,
  * which is what lets us diff against the library without opening every comp.
@@ -15,7 +15,7 @@ import {
   SymbolInstanceInfo,
   LibraryManifest,
   PendingUpdate,
-} from "../../../shared/linkon-types";
+} from "../../../shared/unclecomp-types";
 import { registryPath } from "./paths";
 
 export const emptyRegistry = (projectPath: string): ProjectRegistry => ({

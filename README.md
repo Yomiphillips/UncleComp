@@ -1,10 +1,10 @@
-# LinkOn
+# uncleComp
 
 **Linked symbols for After Effects.** Mark any comp as a reusable Symbol, browse and preview it
 in the panel, drop it into any project, and have edits to the master propagate everywhere it's used.
 
 After Effects has no native linked-comp concept — Dynamic Link only connects AE to Premiere/Media
-Encoder, and importing an `.aep` just copies items with no back-reference. LinkOn builds that
+Encoder, and importing an `.aep` just copies items with no back-reference. uncleComp builds that
 missing layer on top of AE's scripting DOM. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full
 design and roadmap.
 
@@ -26,7 +26,7 @@ npm install
 npm run build     # builds and symlinks the panel into AE's extensions folder
 ```
 
-Then restart After Effects and open **Window → Extensions → LinkOn**.
+Then restart After Effects and open **Window → Extensions → uncleComp**.
 
 On first run the panel asks for the **library folder** — the shared network location the team
 publishes symbols to. It will contain `library.json` plus a folder per symbol.
@@ -51,12 +51,12 @@ tree like this:
 ```
 src/
   shared/
-    linkon-types.ts        Domain model + identity tag helpers (used by BOTH sides)
+    unclecomp-types.ts     Domain model + identity tag helpers (used by BOTH sides)
     universals.d.ts        Engine → panel event contract
 
   jsx/aeft/                ENGINE — the only layer touching the AE DOM (ExtendScript)
     aeft.ts                Command surface exposed to the panel via evalTS
-    linkon/
+    unclecomp/
       identity.ts          UUID minting, comment tags, finding linked symbols
       publish.ts           Make Symbol + reduceProject packaging
       importer.ts          Import a package, read its identity back
@@ -83,10 +83,10 @@ the UI (ARCHITECTURE.md §3, §4).
 
 ## How identity works
 
-A symbol's UUID is stamped into its comp's `comment` field as `LINKON:<uuid>:<version>` at publish
+A symbol's UUID is stamped into its comp's `comment` field as `UNCLECOMP:<uuid>:<version>` at publish
 time. Because we build the package, the identity is baked into the artifact — an imported symbol is
 self-describing and depends on nothing in the destination project. The per-project sidecar
-(`<project>.linkon.json`) is only a cache; **Repair registry** rebuilds it by scanning comments.
+(`<project>.unclecomp.json`) is only a cache; **Repair registry** rebuilds it by scanning comments.
 
 ## Status
 

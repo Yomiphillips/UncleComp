@@ -1,5 +1,5 @@
 /**
- * LinkOn Engine — the update mechanic (ARCHITECTURE.md §6.4).
+ * uncleComp Engine — the update mechanic (ARCHITECTURE.md §6.4).
  *
  * `AVLayer.replaceSource()` swaps a layer's source while preserving that layer's
  * transforms, keyframes, effects, masks, trim and stretch. That preservation is
@@ -7,7 +7,7 @@
  * spike/01_replace_source_fidelity.jsx verified before we built on it.
  */
 
-import { EngineResult } from "../../../shared/linkon-types";
+import { EngineResult } from "../../../shared/unclecomp-types";
 import { duplicateClaimError, findSymbolComp, writeSymbolTag } from "./identity";
 import { importSymbolPackage, organiseImport } from "./importer";
 import {
@@ -15,6 +15,7 @@ import {
   collectFolder,
   findSymbolFolder,
   removeRetiredItems,
+  unionItems,
 } from "./cleanup";
 
 /** Where a symbol is instanced, for reporting what an update will touch. */
@@ -85,7 +86,7 @@ export const syncSymbol = (
   packagePath: string,
   newVersion: number
 ): EngineResult => {
-  app.beginUndoGroup("LinkOn: sync symbol");
+  app.beginUndoGroup("uncleComp: sync symbol");
   try {
     // Before anything is imported or deleted: refuse a swap we can't aim.
     // Updating one of two identical claimants would leave the other's layers
@@ -131,10 +132,17 @@ export const syncSymbol = (
     writeSymbolTag(incoming, symbolId, newVersion);
     organiseImport(imported, symbolId, newVersion, oldName);
 
-    // Retire the previous version: its own folder when it has one, otherwise
-    // everything reachable from the comp (imports made before symbols were
-    // foldered scatter their assets, but they stay reachable).
-    var retiring = oldFolder ? collectFolder(oldFolder) : collectDependencies(oldComp);
+    // Retire the previous version. Always start from everything reachable from
+    // the old comp itself — the comp plus its precomps, footage and solids — so
+    // the superseded comp is retired even when the user has dragged it out of the
+    // uncleComp bin while organising their project. Relying on the tagged folder's
+    // contents alone left the old comp orphaned as a duplicate in exactly that
+    // case: it is no longer inside the folder, so collectFolder never saw it and
+    // removeRetiredItems never removed it. When the folder is still present we
+    // union its contents in too, so the folder and any assets not reachable
+    // through a layer (e.g. an auto-created "Solids" bin) are swept as well.
+    var retiring = collectDependencies(oldComp);
+    if (oldFolder) retiring = unionItems(retiring, collectFolder(oldFolder));
     var cleanup = removeRetiredItems(retiring);
 
     return {

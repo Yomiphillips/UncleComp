@@ -1,19 +1,19 @@
 /**
- * LinkOn Core Service — user settings.
+ * uncleComp Core Service — user settings.
  *
  * Just the shared-drive library root. Updates are never applied automatically
  * (ARCHITECTURE.md §7), so there is no mode to store alongside it.
  */
 
 import { fs, path, os } from "../cep/node";
-import { LinkOnSettings } from "../../../shared/linkon-types";
+import { UncleCompSettings } from "../../../shared/unclecomp-types";
 
-const settingsDir = (): string => path.join(os.homedir(), ".linkon");
+const settingsDir = (): string => path.join(os.homedir(), ".unclecomp");
 const settingsFile = (): string => path.join(settingsDir(), "settings.json");
 
-export const defaultSettings = (): LinkOnSettings => ({ libraryRoot: "" });
+export const defaultSettings = (): UncleCompSettings => ({ libraryRoot: "" });
 
-export const readSettings = (): LinkOnSettings => {
+export const readSettings = (): UncleCompSettings => {
   try {
     const file = settingsFile();
     if (!fs.existsSync(file)) return defaultSettings();
@@ -26,13 +26,13 @@ export const readSettings = (): LinkOnSettings => {
   }
 };
 
-export const writeSettings = (settings: LinkOnSettings): void => {
+export const writeSettings = (settings: UncleCompSettings): void => {
   const dir = settingsDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(settingsFile(), JSON.stringify(settings, null, 2), "utf8");
 };
 
-export const setLibraryRoot = (libraryRoot: string): LinkOnSettings => {
+export const setLibraryRoot = (libraryRoot: string): UncleCompSettings => {
   const next = { ...readSettings(), libraryRoot };
   writeSettings(next);
   return next;

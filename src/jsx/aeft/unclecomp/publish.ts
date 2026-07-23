@@ -1,5 +1,5 @@
 /**
- * LinkOn Engine — publishing (ARCHITECTURE.md §6.1).
+ * uncleComp Engine — publishing (ARCHITECTURE.md §6.1).
  *
  * "Make Symbol" stamps identity into the comp's comment and saves the master, so
  * the symbol's UUID and version survive the session bounce that packaging causes.
@@ -7,7 +7,7 @@
  * handled deliberately (see `packageSymbol` below).
  */
 
-import { EngineResult, parseTag } from "../../../shared/linkon-types";
+import { EngineResult, parseTag } from "../../../shared/unclecomp-types";
 import {
   generateSymbolId,
   duplicateClaimError,
@@ -36,7 +36,7 @@ const targetComp = (): CompItem | null => {
  * Idempotent: re-running on an already-tagged comp keeps its UUID and bumps version.
  */
 export const makeSymbol = (symbolId?: string): EngineResult => {
-  app.beginUndoGroup("LinkOn: make symbol");
+  app.beginUndoGroup("uncleComp: make symbol");
   try {
     var comp = symbolId ? findSymbolComp(symbolId) : targetComp();
     if (!comp) {

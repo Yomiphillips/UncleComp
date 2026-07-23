@@ -1,5 +1,5 @@
 /**
- * LinkOn Core Service — library layout on the shared drive.
+ * uncleComp Core Service — library layout on the shared drive.
  *
  * One place that knows where things live, so the rest of the service never
  * hand-builds paths. Mirrors the store layout in ARCHITECTURE.md §4.
@@ -32,7 +32,7 @@ export const previewPath = (root: string, symbolId: string): string =>
   path.join(symbolDir(root, symbolId), "preview.mp4");
 
 /** The sidecar that caches which symbols a working project uses (§5.3). */
-export const registryPath = (projectPath: string): string => projectPath + ".linkon.json";
+export const registryPath = (projectPath: string): string => projectPath + ".unclecomp.json";
 
 /** `file://` URL for showing library assets inside the panel's Chromium. */
 export const fileUrl = (absolutePath: string): string =>

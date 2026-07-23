@@ -1,5 +1,5 @@
 /**
- * LinkOn Core Service — the library manifest.
+ * uncleComp Core Service — the library manifest.
  *
  * `library.json` is the source of truth for what symbols exist and at what
  * version. It lives on a shared network drive, so every write goes through
@@ -12,7 +12,7 @@
  */
 
 import { fs, path } from "../cep/node";
-import { LibraryManifest, SymbolMeta } from "../../../shared/linkon-types";
+import { LibraryManifest, SymbolMeta } from "../../../shared/unclecomp-types";
 import { manifestPath, symbolDir, symbolsDir } from "./paths";
 
 export const emptyManifest = (): LibraryManifest => ({ version: 1, symbols: {} });

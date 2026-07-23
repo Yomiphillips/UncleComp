@@ -1,4 +1,4 @@
-# LinkOn — Architecture & Roadmap
+# uncleComp — Architecture & Roadmap
 
 **A "linked symbols" system for After Effects.** Mark any comp as a reusable Symbol/Link,
 browse and preview those symbols in a panel, drop them into any project, and have edits to
@@ -133,7 +133,7 @@ Reliable sync needs an ID that **survives being imported into a new project**. A
 
 - **`symbolId`** — a UUID we generate when a comp is first made a Symbol.
 - **Where it lives so it travels with the comp:** the comp's **`comment`** field, written at publish
-  time, e.g. `LINKON:{symbolId}:{version}`. Because *we* package the symbol's `.aep`, we control the
+  time, e.g. `UNCLECOMP:{symbolId}:{version}`. Because *we* package the symbol's `.aep`, we control the
   comment before saving, so the ID is embedded in the artifact and can be read back on import. This
   closes the identity loop without depending on the destination project at all.
 - **Fallback / repair:** if a comment is stripped or edited, the panel offers a manual "relink to
@@ -163,7 +163,7 @@ Reliable sync needs an ID that **survives being imported into a new project**. A
 }
 ```
 
-### 5.3 Per-project registry — `<project>.linkon.json` (sidecar)
+### 5.3 Per-project registry — `<project>.unclecomp.json` (sidecar)
 
 Records which symbols a given working project uses and at what version, so we can diff against the
 library and drive updates:
@@ -192,7 +192,7 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 ### 6.1 Make Symbol / Publish  (Publisher role)
 
 1. User selects a comp → **"Make Symbol"**.
-2. Engine assigns/reads `symbolId`, writes `LINKON:{id}:{version}` to the comp's `comment`,
+2. Engine assigns/reads `symbolId`, writes `UNCLECOMP:{id}:{version}` to the comp's `comment`,
    **and saves the master project**. That save is not optional: packaging (step 3) reopens the
    master from disk, so an unsaved tag would be lost, the next publish would mint a fresh UUID
    at v1, and no symbol could ever reach v2 — i.e. updates would never exist.
@@ -218,7 +218,7 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 ### 6.3 Import / Link into current project
 
 1. User clicks **Import** on a symbol.
-2. Engine imports `symbols/<uuid>/package.aep` into a dedicated `LinkOn/` bin.
+2. Engine imports `symbols/<uuid>/package.aep` into a dedicated `uncleComp/` bin.
 3. Read the `symbolId` from the imported comp's comment; register in the sidecar + confirm the
    comment tag. The comp is now a *linked instance* the user can drop into their timelines like any comp.
 
@@ -247,7 +247,7 @@ or **Update all**. See §7.
       reported back rather than silently kept.
    f. Update sidecar + comment version.
 
-Imports are parked in a per-symbol folder under the `LinkOn/` bin, tagged `LINKON:{id}:{version}`
+Imports are parked in a per-symbol folder under the `uncleComp/` bin, tagged `UNCLECOMP:{id}:{version}`
 on the *folder* as well as the comp — the comp tag identifies the symbol, the folder tag is what
 lets a later update find and retire precisely that version's items. Imports predating this still
 sync correctly: their assets stay reachable from the comp, so the retiring set is derived by
@@ -300,7 +300,7 @@ walking layer sources instead.
 | Publishing saves the user's master project | Unavoidable — identity must be durable before the packaging bounce (§6.1). Surfaced in the button's tooltip; publish is an explicit, user-initiated action |
 | A consumer republishing a symbol they don't own | "Publish update" only appears when the open project *is* the symbol's `sourceProject` master (§6.6) |
 | Missing fonts / third-party effects on consumer machine | Detect + warn on import; list unmet dependencies |
-| Comp name collisions on import | Namespace imports under a `LinkOn/` bin; disambiguate by `symbolId` |
+| Comp name collisions on import | Namespace imports under a `uncleComp/` bin; disambiguate by `symbolId` |
 | Two people publish the same symbol at once | Version integers + `contentHash`; last-write detection, later a lock (v2) |
 | Master project moved/renamed | Library store is the source of truth, not the master path; store path only as a hint |
 | Large master → slow packaging | `reduceProject` to just the symbol + deps keeps packages small |

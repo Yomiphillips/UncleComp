@@ -1,5 +1,5 @@
 /**
- * LinkOn Engine — the After Effects command surface.
+ * uncleComp Engine — the After Effects command surface.
  *
  * Everything exported here is callable from the panel via `evalTS("name", ...)`
  * with full type-safety. Keep this file a thin re-export: the engine stays a
@@ -14,19 +14,19 @@ export {
   keepSymbolComp,
   listSymbolInstances,
   getProjectPath,
-} from "./linkon/identity";
+} from "./unclecomp/identity";
 
-export { makeSymbol, packageSymbol } from "./linkon/publish";
+export { makeSymbol, packageSymbol } from "./unclecomp/publish";
 
-export { importSymbol } from "./linkon/importer";
+export { importSymbol } from "./unclecomp/importer";
 
-export { syncSymbol, previewSymbolUpdate, findLayersUsingItem } from "./linkon/sync";
+export { syncSymbol, previewSymbolUpdate, findLayersUsingItem } from "./unclecomp/sync";
 
-export { renderPoster, renderPreview } from "./linkon/preview";
+export { renderPoster, renderPreview } from "./unclecomp/preview";
 
-export { openMasterProject, revealSymbol } from "./linkon/edit";
+export { openMasterProject, revealSymbol } from "./unclecomp/edit";
 
 /** Cheap handshake so the panel can confirm the engine loaded. */
-export const linkonPing = (): string => {
-  return "LinkOn engine ready — AE " + app.version;
+export const uncleCompPing = (): string => {
+  return "uncleComp engine ready — AE " + app.version;
 };

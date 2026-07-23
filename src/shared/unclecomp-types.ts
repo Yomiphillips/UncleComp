@@ -1,5 +1,5 @@
 /**
- * LinkOn — shared domain model.
+ * uncleComp — shared domain model.
  *
  * Imported by BOTH the ExtendScript engine (compiled to ES3 with `noLib`) and the
  * panel/Core Service (modern TS). Keep it dependency-free, and use index signatures
@@ -9,7 +9,7 @@
  */
 
 /** Prefix of the identity tag written into a comp's `comment` field. */
-export var TAG_PREFIX = "LINKON";
+export var TAG_PREFIX = "UNCLECOMP";
 
 /** Identity parsed out of a comp's `comment`. */
 export interface SymbolTag {
@@ -19,7 +19,7 @@ export interface SymbolTag {
 
 /**
  * Identity travels *inside the artifact* (ARCHITECTURE.md §5.1): we stamp
- * `LINKON:<uuid>:<version>` into the comp's comment at publish time, so an
+ * `UNCLECOMP:<uuid>:<version>` into the comp's comment at publish time, so an
  * imported symbol is self-describing and needs nothing from the host project.
  */
 export function formatTag(symbolId: string, version: number): string {
@@ -28,7 +28,7 @@ export function formatTag(symbolId: string, version: number): string {
 
 export function parseTag(comment: string): SymbolTag | null {
   if (!comment) return null;
-  var m = comment.match(/LINKON:([0-9a-fA-F\-]+):([0-9]+)/);
+  var m = comment.match(/UNCLECOMP:([0-9a-fA-F\-]+):([0-9]+)/);
   if (!m) return null;
   return { symbolId: m[1], version: parseInt(m[2], 10) };
 }
@@ -42,7 +42,7 @@ export function parseTag(comment: string): SymbolTag | null {
  */
 export function stripTag(comment: string): string {
   if (!comment) return "";
-  var without = comment.replace(/LINKON:[0-9a-fA-F\-]+:[0-9]+/, "");
+  var without = comment.replace(/UNCLECOMP:[0-9a-fA-F\-]+:[0-9]+/, "");
   return without.replace(/^\s+/, "").replace(/\s+$/, ""); // no String.trim in ES3
 }
 
@@ -88,7 +88,7 @@ export interface ProjectInstance {
   itemId?: number;
 }
 
-/** `<project>.linkon.json` sidecar — a cache; always re-derivable by scanning comments. */
+/** `<project>.unclecomp.json` sidecar — a cache; always re-derivable by scanning comments. */
 export interface ProjectRegistry {
   projectPath: string;
   instances: { [symbolId: string]: ProjectInstance };
@@ -99,7 +99,7 @@ export interface ProjectRegistry {
  * Update or Update all. There is deliberately no auto-apply mode: a timeline
  * should never change underneath an editor without them asking (ARCHITECTURE.md §7).
  */
-export interface LinkOnSettings {
+export interface UncleCompSettings {
   libraryRoot: string;
 }
 

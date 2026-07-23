@@ -1,5 +1,5 @@
 /**
- * LinkOn Engine — retiring a superseded symbol import.
+ * uncleComp Engine — retiring a superseded symbol import.
  *
  * Importing a package `.aep` brings in far more than the symbol's comp: every
  * precomp, footage item and solid it depends on arrives too, inside a folder AE
@@ -13,7 +13,7 @@
  * deleting the user's work.
  */
 
-import { parseTag } from "../../../shared/linkon-types";
+import { parseTag } from "../../../shared/unclecomp-types";
 
 export interface CleanupReport {
   removed: number;
@@ -58,6 +58,33 @@ export const collectDependencies = (comp: CompItem): Item[] => {
     }
   }
   return found;
+};
+
+/**
+ * Merge two retiring lists into one with no id repeated, preserving order
+ * (everything from `first`, then anything new from `second`).
+ *
+ * removeRetiredItems calls `.remove()` once per entry, so a repeated item would
+ * be removed on the first pass and then wrongly reported as "kept" (its second
+ * `.remove()` throwing) on the second — dedup keeps the cleanup report honest.
+ * Passing the comp's dependency closure as `first` and the folder contents as
+ * `second` also keeps folders — contributed only by collectFolder, always at its
+ * tail — after the contents they hold, which removeRetiredItems relies on.
+ */
+export const unionItems = (first: Item[], second: Item[]): Item[] => {
+  var seen: { [id: number]: boolean } = {};
+  var out: Item[] = [];
+  for (var i = 0; i < first.length; i++) {
+    if (seen[first[i].id]) continue;
+    seen[first[i].id] = true;
+    out.push(first[i]);
+  }
+  for (var j = 0; j < second.length; j++) {
+    if (seen[second[j].id]) continue;
+    seen[second[j].id] = true;
+    out.push(second[j]);
+  }
+  return out;
 };
 
 /** Everything inside a folder — contents first, deepest folders before their parents. */

@@ -1,11 +1,11 @@
 /**
- * LinkOn Engine — "Edit Symbol" (ARCHITECTURE.md §6.6).
+ * uncleComp Engine — "Edit Symbol" (ARCHITECTURE.md §6.6).
  *
  * Symbols are authored in exactly one place: the master project. Editing a
  * linked instance opens the master rather than letting internals diverge locally.
  */
 
-import { EngineResult } from "../../../shared/linkon-types";
+import { EngineResult } from "../../../shared/unclecomp-types";
 import { findSymbolComp } from "./identity";
 
 export const openMasterProject = (masterPath: string): EngineResult => {

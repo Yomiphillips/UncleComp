@@ -1,14 +1,14 @@
 /**
- * LinkOn Engine — importing a packaged symbol (ARCHITECTURE.md §6.3).
+ * uncleComp Engine — importing a packaged symbol (ARCHITECTURE.md §6.3).
  *
  * Packages are single-comp .aep files with the identity already baked into the
  * comp's comment, so an import is self-describing: we read the UUID back out
  * rather than trusting anything about the destination project.
  */
 
-import { EngineResult, formatTag, parseTag } from "../../../shared/linkon-types";
+import { EngineResult, formatTag, parseTag } from "../../../shared/unclecomp-types";
 
-var LINKON_BIN = "LinkOn";
+var UNCLECOMP_BIN = "uncleComp";
 
 /** A package import: the symbol's comp, plus every item the import created. */
 export interface ImportedPackage {
@@ -17,13 +17,13 @@ export interface ImportedPackage {
 }
 
 /** Namespaced bin so imported symbols never collide with the user's own items. */
-const ensureLinkOnBin = (): FolderItem => {
+const ensureUncleCompBin = (): FolderItem => {
   var proj = app.project;
   for (var i = 1; i <= proj.numItems; i++) {
     var it = proj.item(i);
-    if (it instanceof FolderItem && it.name === LINKON_BIN) return it;
+    if (it instanceof FolderItem && it.name === UNCLECOMP_BIN) return it;
   }
-  return proj.items.addFolder(LINKON_BIN);
+  return proj.items.addFolder(UNCLECOMP_BIN);
 };
 
 const snapshotItemIds = (): { [id: number]: boolean } => {
@@ -79,7 +79,7 @@ export const importSymbolPackage = (
 };
 
 /**
- * Park an import in its own tagged folder under the LinkOn bin.
+ * Park an import in its own tagged folder under the uncleComp bin.
  *
  * The folder tag is what lets a later update find and retire precisely this
  * version's items — the comp's own tag only identifies the comp. Only the
@@ -114,7 +114,7 @@ export const organiseImport = (
   } else {
     container = app.project.items.addFolder(folderName); // package had no folder
   }
-  container.parentFolder = ensureLinkOnBin();
+  container.parentFolder = ensureUncleCompBin();
   container.comment = formatTag(symbolId, version);
 
   for (var k = 0; k < imported.items.length; k++) {
@@ -133,7 +133,7 @@ export const importSymbol = (
   packagePath: string,
   symbolId: string
 ): EngineResult => {
-  app.beginUndoGroup("LinkOn: import symbol");
+  app.beginUndoGroup("uncleComp: import symbol");
   try {
     var imported = importSymbolPackage(packagePath, symbolId);
     if (!imported) {

@@ -1,4 +1,4 @@
-/** LinkOn Core Service — public surface for the panel. */
+/** uncleComp Core Service — public surface for the panel. */
 
 export * from "./paths";
 export * from "./manifest";

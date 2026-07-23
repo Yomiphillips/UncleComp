@@ -3,8 +3,8 @@ import { version } from "./package.json";
 
 const config: CEP_Config = {
   version,
-  id: "com.linkon.cep", 
-  displayName: "LinkOn", 
+  id: "com.unclecomp.cep",
+  displayName: "uncleComp",
   symlink: "local",
   port: 3000,
   servePort: 5000,
@@ -28,7 +28,7 @@ const config: CEP_Config = {
     {
       mainPath: "./main/index.html",
       name: "main",
-      panelDisplayName: "LinkOn", 
+      panelDisplayName: "uncleComp",
       autoVisible: true,
       width: 600,
       height: 650,
@@ -41,7 +41,7 @@ const config: CEP_Config = {
   zxp: {
     country: "US",
     province: "CA",
-    org: "LinkOn",
+    org: "uncleComp",
     password: "password",
     tsa: [
       "http://timestamp.digicert.com/", // Windows Only

@@ -1,5 +1,5 @@
 /**
- * LinkOn Core Service — library watcher.
+ * uncleComp Core Service — library watcher.
  *
  * Watching `library.json` is what turns "check for updates" into live update
  * badges (ARCHITECTURE.md §9 Phase 2). Publishes land as an atomic rename, which

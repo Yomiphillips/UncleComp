@@ -1,5 +1,5 @@
 /**
- * LinkOn Engine — preview rendering (ARCHITECTURE.md §6.1).
+ * uncleComp Engine — preview rendering (ARCHITECTURE.md §6.1).
  *
  * Everything is rendered by After Effects itself — no external encoder.
  * H.264 was absent from AE's Render Queue between CC2014 and 2019, but Adobe
@@ -13,7 +13,7 @@
  * the lowest-bitrate H.264 template available.
  */
 
-import { EngineResult } from "../../../shared/linkon-types";
+import { EngineResult } from "../../../shared/unclecomp-types";
 import { findSymbolComp } from "./identity";
 
 /** Never exceed this width, so 4K/8K symbols don't produce heavy previews. */
@@ -118,7 +118,7 @@ export const renderPreview = (
   maxSeconds: number,
   fps: number
 ): EngineResult => {
-  app.beginUndoGroup("LinkOn: render preview");
+  app.beginUndoGroup("uncleComp: render preview");
   var wrapper: CompItem | null = null;
   var rqItem: RenderQueueItem | null = null;
   var paused: number[] = [];
@@ -138,7 +138,7 @@ export const renderPreview = (
     if (maxSeconds > 0 && duration > maxSeconds) duration = maxSeconds;
 
     wrapper = app.project.items.addComp(
-      "LinkOn_preview_tmp",
+      "uncleComp_preview_tmp",
       qW,
       qH,
       1,

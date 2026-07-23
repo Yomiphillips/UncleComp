@@ -1,5 +1,5 @@
 /**
- * LinkOn Core Service — flow orchestration.
+ * uncleComp Core Service — flow orchestration.
  *
  * The panel calls these; they compose the ExtendScript engine (AE DOM work) with
  * the Node store (manifest, registry, settings). Keeping the composition here means
@@ -12,7 +12,7 @@ import {
   SymbolMeta,
   PendingUpdate,
   SymbolInstanceInfo,
-} from "../../../shared/linkon-types";
+} from "../../../shared/unclecomp-types";
 import {
   ensureLibrary,
   ensureSymbolDir,

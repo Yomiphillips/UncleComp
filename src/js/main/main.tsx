@@ -25,10 +25,10 @@ import {
 } from "../lib/core";
 import type { DuplicateClaim } from "../lib/core";
 import type {
-  LinkOnSettings,
+  UncleCompSettings,
   PendingUpdate,
   SymbolMeta,
-} from "../../shared/linkon-types";
+} from "../../shared/unclecomp-types";
 import "./main.scss";
 
 const DUPLICATE_HINT =
@@ -41,7 +41,7 @@ const HOVER_RESCAN_COOLDOWN_MS = 1500;
 const chooseFolder = (): string | null => {
   const cep = (window as any).cep;
   if (!cep || !cep.fs || !cep.fs.showOpenDialog) return null;
-  const res = cep.fs.showOpenDialog(false, true, "Choose LinkOn library folder", "");
+  const res = cep.fs.showOpenDialog(false, true, "Choose uncleComp library folder", "");
   return res && res.data && res.data.length ? res.data[0] : null;
 };
 
@@ -242,7 +242,7 @@ const SymbolCard = ({
 };
 
 export const App = () => {
-  const [settings, setSettings] = useState<LinkOnSettings>({ libraryRoot: "" });
+  const [settings, setSettings] = useState<UncleCompSettings>({ libraryRoot: "" });
   const [symbols, setSymbols] = useState<SymbolMeta[]>([]);
   const [pending, setPending] = useState<PendingUpdate[]>([]);
   const [inProject, setInProject] = useState<{ [id: string]: boolean }>({});
@@ -373,8 +373,8 @@ export const App = () => {
   if (!settings.libraryRoot) {
     return (
       <div className="app setup">
-        <span className="wordmark">LinkOn</span>
-        <p>Point LinkOn at the shared folder your team uses as the symbol library.</p>
+        <span className="wordmark">uncleComp</span>
+        <p>Point uncleComp at the shared folder your team uses as the symbol library.</p>
         <button className="primary" onClick={pickLibrary}>
           Choose folder
         </button>
@@ -386,7 +386,7 @@ export const App = () => {
     <div className="app" onMouseEnter={rescanOnHover}>
       <header>
         <div className="row">
-          <span className="wordmark">LinkOn</span>
+          <span className="wordmark">uncleComp</span>
           <span className="spacer" />
           <button onClick={pickLibrary} title={settings.libraryRoot}>
             Library
@@ -410,7 +410,7 @@ export const App = () => {
         </div>
       </header>
 
-      {/* Duplicating a comp copies its LinkOn identity, so two comps now claim
+      {/* Duplicating a comp copies its uncleComp identity, so two comps now claim
           one symbol. We never guess which is the real one — the engine refuses to
           publish or sync until the user picks. Choosing which to keep detaches
           the rest, so exactly one comp always carries the symbol. */}
