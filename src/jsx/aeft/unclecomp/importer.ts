@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — importing a packaged symbol (ARCHITECTURE.md §6.3).
+ * UncleComp Engine — importing a packaged symbol (ARCHITECTURE.md §6.3).
  *
  * Packages are single-comp .aep files with the identity already baked into the
  * comp's comment, so an import is self-describing: we read the UUID back out
@@ -8,7 +8,7 @@
 
 import { EngineResult, formatTag, parseTag } from "../../../shared/unclecomp-types";
 
-var UNCLECOMP_BIN = "uncleComp";
+var UNCLECOMP_BIN = "UncleComp";
 
 /** A package import: the symbol's comp, plus every item the import created. */
 export interface ImportedPackage {
@@ -24,6 +24,16 @@ const ensureUncleCompBin = (): FolderItem => {
     if (it instanceof FolderItem && it.name === UNCLECOMP_BIN) return it;
   }
   return proj.items.addFolder(UNCLECOMP_BIN);
+};
+
+/**
+ * The comp the user is working in, or null when none is focused. Captured
+ * *before* the import runs: importing changes the Project-panel selection, and
+ * `activeItem` follows it — reading afterwards could return the wrong comp.
+ */
+const captureActiveComp = (): CompItem | null => {
+  var active = app.project.activeItem;
+  return active instanceof CompItem ? active : null;
 };
 
 const snapshotItemIds = (): { [id: number]: boolean } => {
@@ -79,7 +89,7 @@ export const importSymbolPackage = (
 };
 
 /**
- * Park an import in its own tagged folder under the uncleComp bin.
+ * Park an import in its own tagged folder under the UncleComp bin.
  *
  * The folder tag is what lets a later update find and retire precisely this
  * version's items — the comp's own tag only identifies the comp. Only the
@@ -133,8 +143,11 @@ export const importSymbol = (
   packagePath: string,
   symbolId: string
 ): EngineResult => {
-  app.beginUndoGroup("uncleComp: import symbol");
+  app.beginUndoGroup("UncleComp: import symbol");
   try {
+    // Where the user is working — resolved before the import touches selection.
+    var target = captureActiveComp();
+
     var imported = importSymbolPackage(packagePath, symbolId);
     if (!imported) {
       return { ok: false, error: "No tagged comp found in package: " + packagePath };
@@ -142,6 +155,16 @@ export const importSymbol = (
     var comp = imported.comp;
     var tag = parseTag(comp.comment);
     organiseImport(imported, symbolId, tag ? tag.version : 0, comp.name);
+
+    // Drop the symbol straight into the comp the user was focused in: layer at
+    // the top of the stack, starting at the playhead — importing is a "place it
+    // here" gesture, and here means where the user is parked in time. With no
+    // comp focused, the import simply lands in the UncleComp bin as before.
+    if (target) {
+      var layer = target.layers.add(comp);
+      layer.startTime = target.time;
+    }
+
     return {
       ok: true,
       data: {
@@ -149,6 +172,7 @@ export const importSymbol = (
         version: tag ? tag.version : 0,
         compName: comp.name,
         itemId: comp.id,
+        placedIn: target ? target.name : "",
       },
     };
   } catch (e) {

@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — the update mechanic (ARCHITECTURE.md §6.4).
+ * UncleComp Engine — the update mechanic (ARCHITECTURE.md §6.4).
  *
  * `AVLayer.replaceSource()` swaps a layer's source while preserving that layer's
  * transforms, keyframes, effects, masks, trim and stretch. That preservation is
@@ -86,7 +86,7 @@ export const syncSymbol = (
   packagePath: string,
   newVersion: number
 ): EngineResult => {
-  app.beginUndoGroup("uncleComp: sync symbol");
+  app.beginUndoGroup("UncleComp: sync symbol");
   try {
     // Before anything is imported or deleted: refuse a swap we can't aim.
     // Updating one of two identical claimants would leave the other's layers
@@ -135,7 +135,7 @@ export const syncSymbol = (
     // Retire the previous version. Always start from everything reachable from
     // the old comp itself — the comp plus its precomps, footage and solids — so
     // the superseded comp is retired even when the user has dragged it out of the
-    // uncleComp bin while organising their project. Relying on the tagged folder's
+    // UncleComp bin while organising their project. Relying on the tagged folder's
     // contents alone left the old comp orphaned as a duplicate in exactly that
     // case: it is no longer inside the folder, so collectFolder never saw it and
     // removeRetiredItems never removed it. When the folder is still present we

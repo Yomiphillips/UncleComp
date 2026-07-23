@@ -1,5 +1,5 @@
 /**
- * uncleComp Core Service — per-project registry (ARCHITECTURE.md §5.3).
+ * UncleComp Core Service — per-project registry (ARCHITECTURE.md §5.3).
  *
  * The sidecar records which symbols a working project uses and at what version,
  * which is what lets us diff against the library without opening every comp.

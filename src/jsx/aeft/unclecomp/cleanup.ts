@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — retiring a superseded symbol import.
+ * UncleComp Engine — retiring a superseded symbol import.
  *
  * Importing a package `.aep` brings in far more than the symbol's comp: every
  * precomp, footage item and solid it depends on arrives too, inside a folder AE

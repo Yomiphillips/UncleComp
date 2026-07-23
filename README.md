@@ -1,10 +1,10 @@
-# uncleComp
+# UncleComp
 
 **Linked symbols for After Effects.** Mark any comp as a reusable Symbol, browse and preview it
 in the panel, drop it into any project, and have edits to the master propagate everywhere it's used.
 
 After Effects has no native linked-comp concept — Dynamic Link only connects AE to Premiere/Media
-Encoder, and importing an `.aep` just copies items with no back-reference. uncleComp builds that
+Encoder, and importing an `.aep` just copies items with no back-reference. UncleComp builds that
 missing layer on top of AE's scripting DOM. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full
 design and roadmap.
 
@@ -26,7 +26,7 @@ npm install
 npm run build     # builds and symlinks the panel into AE's extensions folder
 ```
 
-Then restart After Effects and open **Window → Extensions → uncleComp**.
+Then restart After Effects and open **Window → Extensions → UncleComp**.
 
 On first run the panel asks for the **library folder** — the shared network location the team
 publishes symbols to. It will contain `library.json` plus a folder per symbol.

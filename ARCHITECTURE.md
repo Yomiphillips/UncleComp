@@ -1,4 +1,4 @@
-# uncleComp — Architecture & Roadmap
+# UncleComp — Architecture & Roadmap
 
 **A "linked symbols" system for After Effects.** Mark any comp as a reusable Symbol/Link,
 browse and preview those symbols in a panel, drop them into any project, and have edits to
@@ -218,8 +218,12 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 ### 6.3 Import / Link into current project
 
 1. User clicks **Import** on a symbol.
-2. Engine imports `symbols/<uuid>/package.aep` into a dedicated `uncleComp/` bin.
-3. Read the `symbolId` from the imported comp's comment; register in the sidecar + confirm the
+2. Engine imports `symbols/<uuid>/package.aep` into a dedicated `UncleComp/` bin, renaming AE's
+   `package.aep` import folder to the comp's own name.
+3. If a comp is focused (open timeline, or selected in the Project panel), the symbol is also added
+   to it as a layer at the top of the stack, starting at the playhead. With nothing focused it just
+   lands in the bin.
+4. Read the `symbolId` from the imported comp's comment; register in the sidecar + confirm the
    comment tag. The comp is now a *linked instance* the user can drop into their timelines like any comp.
 
 ### 6.4 Update / Sync (the payoff)
@@ -247,7 +251,7 @@ or **Update all**. See §7.
       reported back rather than silently kept.
    f. Update sidecar + comment version.
 
-Imports are parked in a per-symbol folder under the `uncleComp/` bin, tagged `UNCLECOMP:{id}:{version}`
+Imports are parked in a per-symbol folder under the `UncleComp/` bin, tagged `UNCLECOMP:{id}:{version}`
 on the *folder* as well as the comp — the comp tag identifies the symbol, the folder tag is what
 lets a later update find and retire precisely that version's items. Imports predating this still
 sync correctly: their assets stay reachable from the comp, so the retiring set is derived by
@@ -300,7 +304,7 @@ walking layer sources instead.
 | Publishing saves the user's master project | Unavoidable — identity must be durable before the packaging bounce (§6.1). Surfaced in the button's tooltip; publish is an explicit, user-initiated action |
 | A consumer republishing a symbol they don't own | "Publish update" only appears when the open project *is* the symbol's `sourceProject` master (§6.6) |
 | Missing fonts / third-party effects on consumer machine | Detect + warn on import; list unmet dependencies |
-| Comp name collisions on import | Namespace imports under a `uncleComp/` bin; disambiguate by `symbolId` |
+| Comp name collisions on import | Namespace imports under a `UncleComp/` bin; disambiguate by `symbolId` |
 | Two people publish the same symbol at once | Version integers + `contentHash`; last-write detection, later a lock (v2) |
 | Master project moved/renamed | Library store is the source of truth, not the master path; store path only as a hint |
 | Large master → slow packaging | `reduceProject` to just the symbol + deps keeps packages small |

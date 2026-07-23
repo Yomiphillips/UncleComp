@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — publishing (ARCHITECTURE.md §6.1).
+ * UncleComp Engine — publishing (ARCHITECTURE.md §6.1).
  *
  * "Make Symbol" stamps identity into the comp's comment and saves the master, so
  * the symbol's UUID and version survive the session bounce that packaging causes.
@@ -36,7 +36,7 @@ const targetComp = (): CompItem | null => {
  * Idempotent: re-running on an already-tagged comp keeps its UUID and bumps version.
  */
 export const makeSymbol = (symbolId?: string): EngineResult => {
-  app.beginUndoGroup("uncleComp: make symbol");
+  app.beginUndoGroup("UncleComp: make symbol");
   try {
     var comp = symbolId ? findSymbolComp(symbolId) : targetComp();
     if (!comp) {

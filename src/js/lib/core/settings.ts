@@ -1,5 +1,5 @@
 /**
- * uncleComp Core Service — user settings.
+ * UncleComp Core Service — user settings.
  *
  * Just the shared-drive library root. Updates are never applied automatically
  * (ARCHITECTURE.md §7), so there is no mode to store alongside it.

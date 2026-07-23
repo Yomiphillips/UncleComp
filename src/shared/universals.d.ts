@@ -4,13 +4,13 @@
  */
 export type EventTS = {
   /** Engine finished tagging/publishing a symbol. */
-  uncleCompSymbolPublished: {
+  UncleCompSymbolPublished: {
     symbolId: string;
     version: number;
     name: string;
   };
   /** Engine finished repointing instances during a sync. */
-  uncleCompSyncComplete: {
+  UncleCompSyncComplete: {
     symbolId: string;
     version: number;
     swapped: number;

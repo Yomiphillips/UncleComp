@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — preview rendering (ARCHITECTURE.md §6.1).
+ * UncleComp Engine — preview rendering (ARCHITECTURE.md §6.1).
  *
  * Everything is rendered by After Effects itself — no external encoder.
  * H.264 was absent from AE's Render Queue between CC2014 and 2019, but Adobe
@@ -118,7 +118,7 @@ export const renderPreview = (
   maxSeconds: number,
   fps: number
 ): EngineResult => {
-  app.beginUndoGroup("uncleComp: render preview");
+  app.beginUndoGroup("UncleComp: render preview");
   var wrapper: CompItem | null = null;
   var rqItem: RenderQueueItem | null = null;
   var paused: number[] = [];
@@ -138,7 +138,7 @@ export const renderPreview = (
     if (maxSeconds > 0 && duration > maxSeconds) duration = maxSeconds;
 
     wrapper = app.project.items.addComp(
-      "uncleComp_preview_tmp",
+      "UncleComp_preview_tmp",
       qW,
       qH,
       1,

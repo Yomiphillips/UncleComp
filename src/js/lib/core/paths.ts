@@ -1,5 +1,5 @@
 /**
- * uncleComp Core Service — library layout on the shared drive.
+ * UncleComp Core Service — library layout on the shared drive.
  *
  * One place that knows where things live, so the rest of the service never
  * hand-builds paths. Mirrors the store layout in ARCHITECTURE.md §4.

@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — "Edit Symbol" (ARCHITECTURE.md §6.6).
+ * UncleComp Engine — "Edit Symbol" (ARCHITECTURE.md §6.6).
  *
  * Symbols are authored in exactly one place: the master project. Editing a
  * linked instance opens the master rather than letting internals diverge locally.

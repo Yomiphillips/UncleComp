@@ -41,7 +41,7 @@ const HOVER_RESCAN_COOLDOWN_MS = 1500;
 const chooseFolder = (): string | null => {
   const cep = (window as any).cep;
   if (!cep || !cep.fs || !cep.fs.showOpenDialog) return null;
-  const res = cep.fs.showOpenDialog(false, true, "Choose uncleComp library folder", "");
+  const res = cep.fs.showOpenDialog(false, true, "Choose UncleComp library folder", "");
   return res && res.data && res.data.length ? res.data[0] : null;
 };
 
@@ -373,8 +373,8 @@ export const App = () => {
   if (!settings.libraryRoot) {
     return (
       <div className="app setup">
-        <span className="wordmark">uncleComp</span>
-        <p>Point uncleComp at the shared folder your team uses as the symbol library.</p>
+        <span className="wordmark">UncleComp</span>
+        <p>Point UncleComp at the shared folder your team uses as the symbol library.</p>
         <button className="primary" onClick={pickLibrary}>
           Choose folder
         </button>
@@ -386,7 +386,7 @@ export const App = () => {
     <div className="app" onMouseEnter={rescanOnHover}>
       <header>
         <div className="row">
-          <span className="wordmark">uncleComp</span>
+          <span className="wordmark">UncleComp</span>
           <span className="spacer" />
           <button onClick={pickLibrary} title={settings.libraryRoot}>
             Library
@@ -410,7 +410,7 @@ export const App = () => {
         </div>
       </header>
 
-      {/* Duplicating a comp copies its uncleComp identity, so two comps now claim
+      {/* Duplicating a comp copies its UncleComp identity, so two comps now claim
           one symbol. We never guess which is the real one — the engine refuses to
           publish or sync until the user picks. Choosing which to keep detaches
           the rest, so exactly one comp always carries the symbol. */}

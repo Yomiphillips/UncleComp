@@ -1,5 +1,5 @@
 /**
- * uncleComp Core Service — flow orchestration.
+ * UncleComp Core Service — flow orchestration.
  *
  * The panel calls these; they compose the ExtendScript engine (AE DOM work) with
  * the Node store (manifest, registry, settings). Keeping the composition here means
@@ -159,7 +159,11 @@ export const importSymbolToProject = async (
     itemId: res.data.itemId,
   });
 
-  return { ok: true, message: `Imported "${meta.name}" v${meta.currentVersion}` };
+  // Tell the user where it landed — in their comp, or just in the bin.
+  const placed = res.data.placedIn
+    ? ` — added to "${res.data.placedIn}"`
+    : " — in the UncleComp folder";
+  return { ok: true, message: `Imported "${meta.name}" v${meta.currentVersion}${placed}` };
 };
 
 /**

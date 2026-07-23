@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — symbol identity.
+ * UncleComp Engine — symbol identity.
  *
  * A symbol's UUID lives in the comp's `comment` field so it survives being
  * packaged and imported into another project (ARCHITECTURE.md §5.1).
@@ -90,14 +90,14 @@ export const duplicateClaimError = (symbolId: string): string => {
     comps.length +
     " comps in this project claim this symbol (" +
     names.join(", ") +
-    "). Duplicating a comp copies its uncleComp identity too. Detach the copy that " +
+    "). Duplicating a comp copies its UncleComp identity too. Detach the copy that " +
     "should not be the symbol, then try again."
   );
 };
 
 /**
  * Resolve a duplicate: keep the comp the user picked as the symbol, and strip
- * the uncleComp identity from every *other* comp claiming the same `symbolId`,
+ * the UncleComp identity from every *other* comp claiming the same `symbolId`,
  * leaving them as ordinary comps.
  *
  * The user names the survivor, so there is no original to guess at — `keepItemId`
@@ -111,7 +111,7 @@ export const keepSymbolComp = (
   symbolId: string,
   keepItemId: number
 ): EngineResult => {
-  app.beginUndoGroup("uncleComp: resolve duplicated symbol");
+  app.beginUndoGroup("UncleComp: resolve duplicated symbol");
   try {
     var comps = findSymbolComps(symbolId);
 

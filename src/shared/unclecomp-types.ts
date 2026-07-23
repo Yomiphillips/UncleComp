@@ -1,5 +1,5 @@
 /**
- * uncleComp — shared domain model.
+ * UncleComp — shared domain model.
  *
  * Imported by BOTH the ExtendScript engine (compiled to ES3 with `noLib`) and the
  * panel/Core Service (modern TS). Keep it dependency-free, and use index signatures

@@ -1,5 +1,5 @@
 /**
- * uncleComp Engine — the After Effects command surface.
+ * UncleComp Engine — the After Effects command surface.
  *
  * Everything exported here is callable from the panel via `evalTS("name", ...)`
  * with full type-safety. Keep this file a thin re-export: the engine stays a
@@ -27,6 +27,6 @@ export { renderPoster, renderPreview } from "./unclecomp/preview";
 export { openMasterProject, revealSymbol } from "./unclecomp/edit";
 
 /** Cheap handshake so the panel can confirm the engine loaded. */
-export const uncleCompPing = (): string => {
-  return "uncleComp engine ready — AE " + app.version;
+export const UncleCompPing = (): string => {
+  return "UncleComp engine ready — AE " + app.version;
 };

@@ -1,4 +1,4 @@
-/** uncleComp Core Service — public surface for the panel. */
+/** UncleComp Core Service — public surface for the panel. */
 
 export * from "./paths";
 export * from "./manifest";
