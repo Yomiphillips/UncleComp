@@ -99,7 +99,7 @@ Five components, deliberately decoupled so the DOM logic is isolated from UI and
 │  • import packaged .aep     │   │  • Library manifest read/write│
 │  • iterate items / layers   │   │  • fs.watch on library        │
 │  • replaceSource() swaps    │   │  • hashing / versioning       │
-│  • saveFrameToPng previews  │   │  • per-project registry (JSON) │
+│  • saveFrameToPng previews  │   │  • per-project registry (XMP)  │
 │  • reduceProject packaging  │   │  • conflict/dependency resolve │
 │  • beginUndoGroup wrapping  │   └───────────────┬──────────────┘
 └───────────────────────────┘                   │
@@ -163,14 +163,20 @@ Reliable sync needs an ID that **survives being imported into a new project**. A
 }
 ```
 
-### 5.3 Per-project registry — `<project>.unclecomp.json` (sidecar)
+### 5.3 Per-project registry — stored in the project's XMP
 
 Records which symbols a given working project uses and at what version, so we can diff against the
-library and drive updates:
+library and drive updates. It lives **inside the .aep itself** — in the project's XMP metadata
+packet (`app.project.xmpPacket`), as a single JSON-valued property (`xmpDM:UncleCompRegistry`) in
+Adobe's standard Dynamic Media namespace. A custom namespace would be rejected by AE's *internal*
+XMP toolkit on the next save — script-side `registerNamespace` is session-only — so the property
+must live in a namespace AE already knows. Nothing sits next to the project file, the registry
+travels wherever the .aep goes, and a registry write only persists when the project itself is
+saved — exactly the same durability the comment tags of §5.1 have, so the two can never disagree
+about which save they belong to:
 
 ```jsonc
 {
-  "projectId": "…",
   "instances": {
     "8f3c…": {
       "symbolId": "8f3c…",
@@ -182,8 +188,10 @@ library and drive updates:
 }
 ```
 
-The sidecar is a convenience/cache; the source of truth for "which symbols are in this project" is
-always re-derivable by scanning item comments (§5.1), so a lost sidecar is recoverable.
+The registry is a convenience/cache; the source of truth for "which symbols are in this project" is
+always re-derivable by scanning item comments (§5.1), so lost registry data is recoverable.
+Projects written by older builds carried a `<project>.unclecomp.json` sidecar; the first read
+imports it into the project's XMP and deletes the file.
 
 ---
 
@@ -191,7 +199,9 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 
 ### 6.1 Make Symbol / Publish  (Publisher role)
 
-1. User selects a comp → **"Make Symbol"**.
+1. User selects one or more comps → **"Make Symbol"**. Each selected comp becomes its own symbol.
+   Targets are captured as item ids up front — packaging (step 3) bounces the session, which clears
+   the selection — then published sequentially and independently, so one failure doesn't stop the rest.
 2. Engine assigns/reads `symbolId`, writes `UNCLECOMP:{id}:{version}` to the comp's `comment`,
    **and saves the master project**. That save is not optional: packaging (step 3) reopens the
    master from disk, so an unsaved tag would be lost, the next publish would mint a fresh UUID
@@ -223,8 +233,8 @@ always re-derivable by scanning item comments (§5.1), so a lost sidecar is reco
 3. If a comp is focused (open timeline, or selected in the Project panel), the symbol is also added
    to it as a layer at the top of the stack, starting at the playhead. With nothing focused it just
    lands in the bin.
-4. Read the `symbolId` from the imported comp's comment; register in the sidecar + confirm the
-   comment tag. The comp is now a *linked instance* the user can drop into their timelines like any comp.
+4. Read the `symbolId` from the imported comp's comment; register in the project registry + confirm
+   the comment tag. The comp is now a *linked instance* the user can drop into their timelines like any comp.
 
 ### 6.4 Update / Sync (the payoff)
 
@@ -235,7 +245,7 @@ how a newly opened project is picked up since AE fires no scriptable project-ope
 always manual:** the panel raises out-of-date badges and the user presses **Update** on a symbol
 or **Update all**. See §7.
 
-1. Core Service diffs sidecar `importedVersion` vs manifest `currentVersion` per symbol.
+1. Core Service diffs registry `importedVersion` vs manifest `currentVersion` per symbol.
 2. For each outdated symbol, Engine (inside one `beginUndoGroup`):
    a. Import the new `package.aep` as a temporary new comp.
    b. Find every layer whose `.source` is the old symbol comp (scan all comps' layers).
@@ -249,7 +259,7 @@ or **Update all**. See §7.
       orphans the rest and the project accumulates a dead `package.aep` folder per update.
       Each item is skipped if anything outside the retiring set still uses it, and those are
       reported back rather than silently kept.
-   f. Update sidecar + comment version.
+   f. Update registry + comment version.
 
 Imports are parked in a per-symbol folder under the `UncleComp/` bin, tagged `UNCLECOMP:{id}:{version}`
 on the *folder* as well as the comp — the comp tag identifies the symbol, the folder tag is what
@@ -299,7 +309,7 @@ walking layer sources instead.
 | "Sync everywhere" implies closed files update themselves | Reframe as sync-on-open + batch updater; set expectation in UI copy |
 | Nested symbols / symbol-within-symbol | Track `dependencies` in manifest; resolve update order topologically |
 | Expressions break when a source is replaced | `replaceSource(…, true)` fix-expressions flag; flag unresolved ones |
-| Symbol comment stripped or hand-edited | Manual "relink" repair flow; sidecar as secondary index |
+| Symbol comment stripped or hand-edited | Manual "relink" repair flow; registry as secondary index |
 | **Duplicating a symbol comp** — AE copies `comment`, so the copy claims the original's `symbolId` (confirmed behaviour) | A contested symbol is never resolved by guessing: the next scan raises a conflict banner and the user picks which comp *is* the symbol, and the rest are detached in one undo group — so exactly one comp always keeps the identity (it can never be reduced to zero). Publish and sync **refuse** while a symbol is contested rather than picking by scan order — which could package a scratch copy or half-update a project |
 | Publishing saves the user's master project | Unavoidable — identity must be durable before the packaging bounce (§6.1). Surfaced in the button's tooltip; publish is an explicit, user-initiated action |
 | A consumer republishing a symbol they don't own | "Publish update" only appears when the open project *is* the symbol's `sourceProject` master (§6.6) |
@@ -332,7 +342,7 @@ symlinked into AE's extensions folder. Remaining Phase 1 work is noted per item 
 - ✅ CEP panel skeleton + ExtendScript engine bridge + Core Service (Node).
 - **Make Symbol** (publish: UUID, package, **1/4-res looping `preview.mp4` + poster**, manifest write).
 - **Media browser** (grid, poster thumbnails, hover-plays the loop, search).
-- **Import/Link** into current project (bin, tag, sidecar register).
+- **Import/Link** into current project (bin, tag, registry record).
 - **User-initiated updates** (§7): badges appear on their own, **Update** / **Update all** apply them.
 - **Shared-drive safety:** atomic manifest writes (write-temp-then-rename) so concurrent readers
   never see a half-written `library.json`.

@@ -68,7 +68,7 @@ src/
   js/lib/core/             CORE SERVICE — the stateful brain (Node, inside CEP)
     paths.ts               Library layout on the shared drive
     manifest.ts            library.json, atomic writes, content hashing
-    registry.ts            Per-project sidecar + pending-update diffing
+    registry.ts            Per-project registry (in the .aep's XMP) + pending-update diffing
     settings.ts            Library root
     watcher.ts             fs.watch on the share → live update badges
     service.ts             Flow orchestration (publish / import / sync)
@@ -85,8 +85,10 @@ the UI (ARCHITECTURE.md §3, §4).
 
 A symbol's UUID is stamped into its comp's `comment` field as `UNCLECOMP:<uuid>:<version>` at publish
 time. Because we build the package, the identity is baked into the artifact — an imported symbol is
-self-describing and depends on nothing in the destination project. The per-project sidecar
-(`<project>.unclecomp.json`) is only a cache; **Repair registry** rebuilds it by scanning comments.
+self-describing and depends on nothing in the destination project. The per-project registry is
+stored inside the .aep itself (in the project's XMP metadata — no sidecar files) and is only a
+cache; **Repair registry** rebuilds it by scanning comments. Legacy `<project>.unclecomp.json`
+sidecars are imported into XMP and deleted on first read.
 
 ## Status
 

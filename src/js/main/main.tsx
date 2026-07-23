@@ -14,7 +14,7 @@ import {
   keepSymbolCopy,
   listProjectSymbols,
   loadLibrary,
-  publishSelectedComp,
+  publishSelectedComps,
   publishSymbolUpdate,
   readSettings,
   relocateMaster,
@@ -401,9 +401,9 @@ export const App = () => {
           <button
             className="primary new"
             disabled={busy}
-            title="Make a symbol from the selected comp"
-            aria-label="Make symbol"
-            onClick={() => run("Publishing", () => publishSelectedComp(settings.libraryRoot))}
+            title="Make symbols from the selected comps"
+            aria-label="Make symbols"
+            onClick={() => run("Publishing", () => publishSelectedComps(settings.libraryRoot))}
           >
             +
           </button>

@@ -16,7 +16,9 @@ export {
   getProjectPath,
 } from "./unclecomp/identity";
 
-export { makeSymbol, packageSymbol } from "./unclecomp/publish";
+export { readRegistryXmp, writeRegistryXmp } from "./unclecomp/registry";
+
+export { makeSymbol, packageSymbol, listSelectedComps } from "./unclecomp/publish";
 
 export { importSymbol } from "./unclecomp/importer";
 

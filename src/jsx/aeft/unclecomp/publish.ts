@@ -7,7 +7,7 @@
  * handled deliberately (see `packageSymbol` below).
  */
 
-import { EngineResult, parseTag } from "../../../shared/unclecomp-types";
+import { EngineResult, parseTag, SelectedCompInfo } from "../../../shared/unclecomp-types";
 import {
   generateSymbolId,
   duplicateClaimError,
@@ -28,24 +28,59 @@ const targetComp = (): CompItem | null => {
 };
 
 /**
+ * Every comp the user has selected (else the active comp), as stable item ids.
+ *
+ * Multi-publish must capture its targets *before* the first publish: packaging
+ * bounces the session (Save-As → reduce → reopen), which destroys the selection.
+ * Item ids are stored in the project file, so they survive every bounce and let
+ * each subsequent publish address its comp exactly.
+ */
+export const listSelectedComps = (): SelectedCompInfo[] => {
+  var out: SelectedCompInfo[] = [];
+  var sel = app.project.selection;
+  for (var i = 0; i < sel.length; i++) {
+    var it = sel[i];
+    if (it instanceof CompItem) out.push({ itemId: it.id, name: it.name });
+  }
+  if (out.length === 0) {
+    var active = app.project.activeItem;
+    if (active && active instanceof CompItem) {
+      out.push({ itemId: active.id, name: active.name });
+    }
+  }
+  return out;
+};
+
+/**
  * Turn a comp into a symbol (or bump an existing one).
  *
  * Pass `symbolId` to republish a specific symbol regardless of what is selected
- * in AE — that is the "Publish update" path. Omit it to symbolise the selection.
+ * in AE — that is the "Publish update" path. Pass `itemId` (with symbolId "")
+ * to symbolise one specific comp — the multi-publish path, where the selection
+ * is gone by the second comp. Omit both to symbolise the selection.
  *
  * Idempotent: re-running on an already-tagged comp keeps its UUID and bumps version.
  */
-export const makeSymbol = (symbolId?: string): EngineResult => {
+export const makeSymbol = (symbolId?: string, itemId?: number): EngineResult => {
   app.beginUndoGroup("UncleComp: make symbol");
   try {
-    var comp = symbolId ? findSymbolComp(symbolId) : targetComp();
+    var comp: CompItem | null = null;
+    if (symbolId) {
+      comp = findSymbolComp(symbolId);
+    } else if (itemId) {
+      var byId = app.project.itemByID(itemId);
+      comp = byId && byId instanceof CompItem ? byId : null;
+    } else {
+      comp = targetComp();
+    }
     if (!comp) {
-      return {
-        ok: false,
-        error: symbolId
-          ? "That symbol's comp isn't in this project — open its master to publish an update."
-          : "Select a composition first.",
-      };
+      var why = "Select a composition first.";
+      if (symbolId) {
+        why = "That symbol's comp isn't in this project — open its master to publish an update.";
+      } else if (itemId) {
+        why = "That comp is no longer in this project.";
+      }
+      return { ok: false, error: why };
     }
     if (!app.project.file) {
       return { ok: false, error: "Save the master project before publishing." };

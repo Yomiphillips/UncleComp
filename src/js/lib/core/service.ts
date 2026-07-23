@@ -54,20 +54,29 @@ export const loadLibrary = (root: string): SymbolMeta[] => {
 /**
  * Publish a comp as a symbol: tag it, render its previews, package it, record it.
  *
- * `symbolId` picks the republish path — bump an existing symbol regardless of the
- * AE selection. Omitted, it symbolises whatever comp is selected.
+ * `republishId` picks the republish path — bump an existing symbol regardless of
+ * the AE selection. `targetItemId` publishes one specific comp — the multi-publish
+ * path, which addresses comps by item id because packaging destroys the selection.
+ * With neither, it symbolises whatever comp is selected.
  *
  * Order is deliberate — packaging is last because it Save-As/reduce/re-opens the
  * session (ARCHITECTURE.md §6.1), so every render must already be on disk.
  */
-const publish = async (root: string, republishId?: string): Promise<FlowResult> => {
+const publish = async (
+  root: string,
+  republishId?: string,
+  targetItemId?: number
+): Promise<FlowResult> => {
   if (!root) return { ok: false, message: "Set a library folder first." };
   ensureLibrary(root);
 
-  // Called with no argument rather than an explicit `undefined` — evalTS
-  // serialises args through JSON, where undefined has no faithful round-trip.
+  // Positional args, never an explicit `undefined` — evalTS serialises args
+  // through JSON, where undefined has no faithful round-trip. "" reads as
+  // "no republish id" on the engine side.
   const made = republishId
     ? await evalTS("makeSymbol", republishId)
+    : targetItemId
+    ? await evalTS("makeSymbol", "", targetItemId)
     : await evalTS("makeSymbol");
   if (!made.ok) return { ok: false, message: made.error || "Could not make symbol." };
 
@@ -113,7 +122,7 @@ const publish = async (root: string, republishId?: string): Promise<FlowResult> 
   // duplicate later, and the master is exactly where duplicating to try an idea
   // is most likely (and most costly — it is what gets published).
   if (sourceProject) {
-    recordInstance(sourceProject, {
+    await recordInstance(sourceProject, {
       symbolId,
       importedVersion: version,
       compName: name,
@@ -130,8 +139,46 @@ const publish = async (root: string, republishId?: string): Promise<FlowResult> 
   };
 };
 
-/** "Make Symbol" — symbolise whatever comp is selected in AE. */
-export const publishSelectedComp = (root: string): Promise<FlowResult> => publish(root);
+/**
+ * "Make Symbol" — symbolise every comp selected in AE, each as its own symbol.
+ *
+ * Targets are captured as item ids before anything runs: each publish bounces
+ * the session while packaging, which destroys the selection, so the remaining
+ * comps could not be found again by asking AE what is selected. Publishes run
+ * sequentially and independently — one failure doesn't stop the rest, and
+ * whatever succeeded is already fully in the library.
+ */
+export const publishSelectedComps = async (root: string): Promise<FlowResult> => {
+  if (!root) return { ok: false, message: "Set a library folder first." };
+
+  const comps = await evalTS("listSelectedComps");
+  if (!comps.length) return { ok: false, message: "Select a composition first." };
+  if (comps.length === 1) return publish(root, undefined, comps[0].itemId);
+
+  const published: string[] = [];
+  const failed: string[] = [];
+  for (const comp of comps) {
+    const res = await publish(root, undefined, comp.itemId);
+    if (res.ok && res.data) {
+      published.push(`"${res.data.name}" v${res.data.currentVersion}`);
+    } else {
+      failed.push(`"${comp.name}": ${res.message}`);
+    }
+  }
+
+  if (!failed.length) {
+    return { ok: true, message: `Published ${published.length} symbols — ${published.join(", ")}` };
+  }
+  if (!published.length) {
+    return { ok: false, message: `Nothing published — ${failed.join(" · ")}` };
+  }
+  return {
+    ok: true,
+    message:
+      `Published ${published.length} of ${comps.length} — ${published.join(", ")}. ` +
+      `Failed: ${failed.join(" · ")}`,
+  };
+};
 
 /**
  * "Publish update" — bump an existing symbol from its master project.
@@ -140,7 +187,7 @@ export const publishSelectedComp = (root: string): Promise<FlowResult> => publis
 export const publishSymbolUpdate = (root: string, symbolId: string): Promise<FlowResult> =>
   publish(root, symbolId);
 
-/** Bring a symbol into the open project and record it in the sidecar. */
+/** Bring a symbol into the open project and record it in the project registry. */
 export const importSymbolToProject = async (
   root: string,
   symbolId: string
@@ -152,7 +199,7 @@ export const importSymbolToProject = async (
   if (!res.ok) return { ok: false, message: res.error || "Import failed." };
 
   const projectPath = await evalTS("getProjectPath");
-  recordInstance(projectPath, {
+  await recordInstance(projectPath, {
     symbolId,
     importedVersion: meta.currentVersion,
     compName: res.data.compName,
@@ -361,7 +408,7 @@ export const applyUpdate = async (root: string, symbolId: string): Promise<FlowR
   if (!res.ok) return { ok: false, message: res.error || "Sync failed." };
 
   const projectPath = await evalTS("getProjectPath");
-  recordInstance(projectPath, {
+  await recordInstance(projectPath, {
     symbolId,
     importedVersion: meta.currentVersion,
     compName: meta.name,
@@ -394,12 +441,15 @@ export const applyAllUpdates = async (root: string): Promise<FlowResult> => {
   return { ok: true, message: `Updated ${applied} of ${pending.length} symbol(s).` };
 };
 
-/** Rebuild the sidecar from the project itself (repair path for a lost registry). */
+/**
+ * Rebuild the registry from the project itself (repair path for lost or stale
+ * registry data). Works even before the project is first saved — the registry
+ * lives in the project's XMP, which needs no path.
+ */
 export const resyncRegistry = async (): Promise<FlowResult> => {
   const projectPath = await evalTS("getProjectPath");
-  if (!projectPath) return { ok: false, message: "Save the project first." };
   const instances: SymbolInstanceInfo[] = await evalTS("listSymbolInstances");
-  const registry = reconcile(projectPath, instances);
+  const registry = await reconcile(projectPath, instances);
   return {
     ok: true,
     message: `Registry rebuilt: ${Object.keys(registry.instances).length} linked symbol(s).`,

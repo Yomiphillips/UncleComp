@@ -31,7 +31,11 @@ export const posterPath = (root: string, symbolId: string): string =>
 export const previewPath = (root: string, symbolId: string): string =>
   path.join(symbolDir(root, symbolId), "preview.mp4");
 
-/** The sidecar that caches which symbols a working project uses (§5.3). */
+/**
+ * LEGACY: the sidecar older builds wrote next to the project. The registry now
+ * lives in the project's XMP (§5.3); this path only locates old sidecars so the
+ * first read can import and delete them.
+ */
 export const registryPath = (projectPath: string): string => projectPath + ".unclecomp.json";
 
 /** `file://` URL for showing library assets inside the panel's Chromium. */

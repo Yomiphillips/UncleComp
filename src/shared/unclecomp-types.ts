@@ -83,12 +83,17 @@ export interface ProjectInstance {
    * AE item id of the comp we registered. This is what tells the original apart
    * from a duplicate: duplicating a comp copies its `comment` (and so its
    * symbolId), but AE always assigns the copy a fresh item id. Optional because
-   * sidecars written before this existed won't have it.
+   * registries written before this existed won't have it.
    */
   itemId?: number;
 }
 
-/** `<project>.unclecomp.json` sidecar — a cache; always re-derivable by scanning comments. */
+/**
+ * The per-project registry — stored inside the .aep, in the project's XMP
+ * packet (§5.3). Only `instances` is persisted; `projectPath` labels the
+ * in-memory value (and locates legacy sidecars), since a stored path would go
+ * stale on Save As. A cache: always re-derivable by scanning comp comments.
+ */
 export interface ProjectRegistry {
   projectPath: string;
   instances: { [symbolId: string]: ProjectInstance };
@@ -101,6 +106,12 @@ export interface ProjectRegistry {
  */
 export interface UncleCompSettings {
   libraryRoot: string;
+}
+
+/** A comp in the user's AE selection — a multi-publish target (see listSelectedComps). */
+export interface SelectedCompInfo {
+  itemId: number;
+  name: string;
 }
 
 /** A linked symbol discovered in the currently open project. */
