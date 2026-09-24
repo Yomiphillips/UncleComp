@@ -21,6 +21,7 @@ import {
   resyncRegistry,
   revokeAssetUrl,
   setLibraryRoot,
+  toSystemPath,
   watchLibrary,
 } from "../lib/core";
 import type { DuplicateClaim } from "../lib/core";
@@ -37,20 +38,27 @@ const DUPLICATE_HINT =
 /** Shortest gap between hover-triggered re-scans; each one round-trips into AE. */
 const HOVER_RESCAN_COOLDOWN_MS = 1500;
 
-/** Native folder picker; CEP exposes this on window.cep.fs. */
+/**
+ * Native folder picker; CEP exposes this on window.cep.fs. Prefer the Ex
+ * variant — on macOS the plain dialog returns percent-encoded `file://` URLs
+ * (always for mounted volumes like LucidLink); either way the result goes
+ * through toSystemPath so fs receives a real path.
+ */
 const chooseFolder = (): string | null => {
   const cep = (window as any).cep;
-  if (!cep || !cep.fs || !cep.fs.showOpenDialog) return null;
-  const res = cep.fs.showOpenDialog(false, true, "Choose UncleComp library folder", "");
-  return res && res.data && res.data.length ? res.data[0] : null;
+  const dialog = cep && cep.fs && (cep.fs.showOpenDialogEx || cep.fs.showOpenDialog);
+  if (!dialog) return null;
+  const res = dialog(false, true, "Choose UncleComp library folder", "");
+  return res && res.data && res.data.length ? toSystemPath(res.data[0]) : null;
 };
 
 /** Native .aep picker — used to relocate a symbol's moved/renamed master project. */
 const chooseProjectFile = (): string | null => {
   const cep = (window as any).cep;
-  if (!cep || !cep.fs || !cep.fs.showOpenDialog) return null;
-  const res = cep.fs.showOpenDialog(false, false, "Locate the master project", "", ["aep"]);
-  return res && res.data && res.data.length ? res.data[0] : null;
+  const dialog = cep && cep.fs && (cep.fs.showOpenDialogEx || cep.fs.showOpenDialog);
+  if (!dialog) return null;
+  const res = dialog(false, false, "Locate the master project", "", ["aep"]);
+  return res && res.data && res.data.length ? toSystemPath(res.data[0]) : null;
 };
 
 const SymbolCard = ({

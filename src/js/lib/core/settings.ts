@@ -6,6 +6,7 @@
  */
 
 import { fs, path, os } from "../cep/node";
+import { toSystemPath } from "./paths";
 import { UncleCompSettings } from "../../../shared/unclecomp-types";
 
 const settingsDir = (): string => path.join(os.homedir(), ".unclecomp");
@@ -19,8 +20,10 @@ export const readSettings = (): UncleCompSettings => {
     if (!fs.existsSync(file)) return defaultSettings();
     const stored = JSON.parse(fs.readFileSync(file, "utf8"));
     // Read only what we still recognise, so a retired key (the old `updateMode`)
-    // isn't carried forward on the next write.
-    return { ...defaultSettings(), libraryRoot: stored.libraryRoot || "" };
+    // isn't carried forward on the next write. toSystemPath heals roots that
+    // older builds stored as `file:///Volumes/…` URLs (macOS picker on shared
+    // volumes) without making the user pick the folder again.
+    return { ...defaultSettings(), libraryRoot: toSystemPath(stored.libraryRoot || "") };
   } catch {
     return defaultSettings();
   }

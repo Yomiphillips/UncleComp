@@ -38,6 +38,33 @@ export const previewPath = (root: string, symbolId: string): string =>
  */
 export const registryPath = (projectPath: string): string => projectPath + ".unclecomp.json";
 
+/**
+ * Normalize a path that may arrive as a `file://` URL into a plain path Node
+ * can open.
+ *
+ * On macOS, CEP's native open dialog hands back percent-encoded `file://` URLs
+ * for folders on mounted volumes (LucidLink, SMB shares — anything under
+ * /Volumes) and for names with spaces or non-ASCII characters. Stored raw,
+ * that string reaches fs and fails with ENOENT ("no such file or directory,
+ * 'file:///Volumes/…'"), so every path from a picker funnels through here.
+ * Plain paths (all of Windows, local macOS folders) pass through untouched.
+ */
+export const toSystemPath = (raw: string): string => {
+  if (!raw) return "";
+  let p = raw.trim();
+  if (/^file:\/\//i.test(p)) {
+    p = p.replace(/^file:\/\/(localhost)?/i, "");
+    try {
+      p = decodeURIComponent(p);
+    } catch {
+      // Malformed escape sequence — the stripped path is still the best guess.
+    }
+    // Windows file URLs put a slash before the drive letter (file:///C:/…).
+    if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+  }
+  return p;
+};
+
 /** `file://` URL for showing library assets inside the panel's Chromium. */
 export const fileUrl = (absolutePath: string): string =>
   "file:///" + absolutePath.replace(/\\/g, "/");
